@@ -26,22 +26,24 @@
 
 /* Radio configuration parameters */
 
-struct radio_config_s {
+struct radio_config_s
+{
   char callsign[CONFIG_PYGMY_CALLSIGN_LEN + 1]; /* Call sign and '\0' */
-  uint32_t frequency;                           /* Operating frequency in Hz */
-  uint32_t bandwidth;                           /* Operating bandwidth in kHz */
-  uint16_t prlen;                               /* Packet preamble length */
-  uint8_t spread;                               /* Spread factor */
-  uint8_t mod;                                  /* Modulation type */
-  float txpower;                                /* Transmission power in dBm */
-} PACKED;
+  uint32_t frequency; /* Operating frequency in Hz */
+  uint32_t bandwidth; /* Operating bandwidth in kHz */
+  uint16_t prlen;     /* Packet preamble length */
+  uint8_t spread;     /* Spread factor */
+  uint8_t mod;        /* Modulation type */
+  float txpower;      /* Transmission power in dBm */
+};
 
 /* Telemetry system configuration. Must be kept at a consistent size since
  * configuration is read from external storage at startup.
  */
 
-struct configuration_s {
+struct configuration_s
+{
   struct radio_config_s radio; /* Radio parameters */
-} PACKED;
+};
 
 #endif /* _PYGMY_CONFIG_H_ */

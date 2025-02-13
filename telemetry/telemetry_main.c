@@ -29,6 +29,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -64,7 +65,8 @@ void *radio_thread(void *arg);
  * telemetry_main
  ****************************************************************************/
 
-int main(int argc, FAR char *argv[]) {
+int main(int argc, FAR char *argv[])
+{
 
   int err;
   int configfile;
@@ -74,52 +76,71 @@ int main(int argc, FAR char *argv[]) {
   /* Read configuration data */
 
   configfile = open(CONFIG_PYGMY_TELEM_CONFIGFILE, O_RDONLY);
-  if (configfile < 0) {
-    err = errno;
-    fprintf(stderr, "Couldn't open configuration file: %d\n", err);
-    return EXIT_FAILURE;
-  }
+  if (configfile < 0)
+    {
+      err = errno;
+      fprintf(stderr, "Couldn't open configuration file: %d\n", err);
+      return EXIT_FAILURE;
+    }
 
   b_read = read(configfile, &config, sizeof(config));
-  if (b_read < 0) {
-    err = errno;
-    fprintf(stderr, "Couldn't read configuration file: %d\n", err);
-    close(configfile);
-    return EXIT_FAILURE;
-  } else if (b_read < sizeof(config)) {
-    fprintf(stderr, "Couldn't read complete configuration file: %d\n", err);
-    close(configfile);
-    return EXIT_FAILURE;
-  }
+  if (b_read < 0)
+    {
+      err = errno;
+      fprintf(stderr, "Couldn't read configuration file: %d\n", err);
+      close(configfile);
+      return EXIT_FAILURE;
+    }
+  else if (b_read < sizeof(config))
+    {
+      fprintf(stderr, "Couldn't read complete configuration file: %d\n", err);
+      close(configfile);
+      return EXIT_FAILURE;
+    }
 
   close(configfile);
 
   /* Configure sensors and perform setup */
+
+  // TODO: for now, just fill configuration with some valid parameters since
+  // EEPROM is full of junk
+  config.radio.mod = 0;
+  config.radio.prlen = 6;
+  config.radio.frequency = 902000000;
+  config.radio.spread = 7;
+  config.radio.txpower = 2.0f;
+  config.radio.bandwidth = 125;
+  memcpy(config.radio.callsign, "VA3INI", sizeof("VA3INI") - 1);
+
   // TODO
 
   /* Start logging thread. */
 
   err = pthread_create(&log_pid, NULL, log_thread, NULL);
-  if (err < 0) {
-    fprintf(stderr, "Failed to start logging thread %d\n", err);
-  }
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to start logging thread %d\n", err);
+    }
 
   /* Start radio broadcast thread */
 
   err = pthread_create(&radio_pid, NULL, radio_thread, &config.radio);
-  if (err < 0) {
-    fprintf(stderr, "Failed to start radio thread: %d\n", err);
-  }
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to start radio thread: %d\n", err);
+    }
 
   pthread_join(log_pid, (void *)&err);
-  if (err) {
-    fprintf(stderr, "Logging thread exited with error: %d\n", err);
-  }
+  if (err)
+    {
+      fprintf(stderr, "Logging thread exited with error: %d\n", err);
+    }
 
   pthread_join(radio_pid, (void *)&err);
-  if (err) {
-    fprintf(stderr, "Radio thread exited with error: %d\n", err);
-  }
+  if (err)
+    {
+      fprintf(stderr, "Radio thread exited with error: %d\n", err);
+    }
 
   return EXIT_SUCCESS;
 }

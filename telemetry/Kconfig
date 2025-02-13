@@ -11,6 +11,14 @@ config PYGMY_TELEM_TELEMETRY
 
 if PYGMY_TELEM_TELEMETRY
 
+config PYGMY_TELEM_PRIORITY
+    int "Application priority"
+    default 100
+
+config PYGMY_TELEM_STACKSIZE
+    int "Application stack size"
+    default 2048
+
 config PYGMY_TELEM_RADIOPATH
     string "Radio path"
     default "/dev/rn2903"

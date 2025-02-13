@@ -1,5 +1,5 @@
 ############################################################################
-# pygmy-telem/telemetry/Makefile
+# apps/pygmy-telem/Makefile
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -20,21 +20,6 @@
 #
 ############################################################################
 
-include $(APPDIR)/Make.defs
+MENUDESC = "Pygmy Telemetry"
 
-# Telemetry logger application information
-
-PROGNAME  = pygmy_telem
-PRIORITY  = $(CONFIG_PYGMY_TELEM_PRIORITY)
-STACKSIZE = $(CONFIG_PYGMY_TELEM_STACKSIZE)
-MODULE    = $(CONFIG_PYGMY_TELEM_TELEMETRY)
-
-# Source files
-
-MAINSRC = telemetry_main.c
-
-CSRCS += log_thread.c
-CSRCS += radio_thread.c
-CSRCS += ../packets/packets.c
-
-include $(APPDIR)/Application.mk
+include $(APPDIR)/Directory.mk

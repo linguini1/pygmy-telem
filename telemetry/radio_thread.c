@@ -28,14 +28,17 @@
  * information and exiting the thread. This is a cancellation point.
  */
 
-#define ioctl_err_cancle(msg, err)                                             \
-  do {                                                                         \
-    if (err < 0) {                                                             \
-      err = errno;                                                             \
-      fprintf(stderr, msg ": %d\n", err);                                      \
-      pthread_exit((void *)(long)err);                                         \
-    }                                                                          \
-  } while (0)
+#define ioctl_err_cancel(msg, err)                                           \
+  do                                                                         \
+    {                                                                        \
+      if (err < 0)                                                           \
+        {                                                                    \
+          err = errno;                                                       \
+          fprintf(stderr, msg ": %d\n", err);                                \
+          pthread_exit((void *)(long)err);                                   \
+        }                                                                    \
+    }                                                                        \
+  while (0)
 
 /****************************************************************************
  * Private Data
@@ -71,7 +74,8 @@ static void close_fd(void *arg) { close(*(int *)(arg)); }
  *
  ****************************************************************************/
 
-void *radio_thread(void *arg) {
+void *radio_thread(void *arg)
+{
 
   struct radio_config_s *config = (struct radio_config_s *)(arg);
   int radio;
@@ -81,11 +85,12 @@ void *radio_thread(void *arg) {
   /* Open radio file descriptor */
 
   radio = open(CONFIG_PYGMY_TELEM_RADIOPATH, O_RDWR);
-  if (radio < 0) {
-    err = errno;
-    fprintf(stderr, "Couldn't open radio: %d\n", err);
-    pthread_exit((void *)(long)err);
-  }
+  if (radio < 0)
+    {
+      err = errno;
+      fprintf(stderr, "Couldn't open radio: %d\n", err);
+      pthread_exit((void *)(long)err);
+    }
 
   pthread_cleanup_push(close_fd, &radio);
 
@@ -98,32 +103,40 @@ void *radio_thread(void *arg) {
   /* Set operating frequency */
 
   err = ioctl(radio, WLIOC_SETRADIOFREQ, config->frequency);
-  ioctl_err_cancel("Couldn't set radio frequency");
+  ioctl_err_cancel("Couldn't set radio frequency", err);
+  printf("Radio frequency set to %lu Hz\n", config->frequency);
 
   /* Set operating bandwidth */
 
   err = ioctl(radio, WLIOC_SETBANDWIDTH, config->bandwidth);
-  ioctl_err_cancel("Couldn't set radio bandwidth");
+  ioctl_err_cancel("Couldn't set radio bandwidth", err);
+  printf("Radio bandwidth set to %lu kHz\n", config->bandwidth);
 
   /* Set operating preamble length */
 
   err = ioctl(radio, WLIOC_SETPRLEN, config->prlen);
-  ioctl_err_cancel("Couldn't set radio preamble length");
+  ioctl_err_cancel("Couldn't set radio preamble length", err);
+  printf("Radio preamble length set to %u\n", config->prlen);
 
   /* Set operating spread factor */
 
   err = ioctl(radio, WLIOC_SETSPREAD, config->spread);
-  ioctl_err_cancel("Couldn't set radio spread factor");
+  ioctl_err_cancel("Couldn't set radio spread factor", err);
+  printf("Radio spread factor set to sf%u\n", config->spread);
 
   /* Set operating modulation */
 
   err = ioctl(radio, WLIOC_SETMOD, config->mod);
-  ioctl_err_cancel("Couldn't set radio modulation");
+  ioctl_err_cancel("Couldn't set radio modulation", err);
+  printf("Radio modulation set to %u\n", config->mod);
 
   /* Set operating transmission power */
 
-  err = ioctl(radio, WLIOC_SETTXPOWER, config->txpower);
-  ioctl_err_cancel("Couldn't set radio transmit power");
+  err = ioctl(radio, WLIOC_SETTXPOWER, &config->txpower);
+  ioctl_err_cancel("Couldn't set radio transmit power", err);
+  printf("Radio transmit power set to %.2f\n", config->txpower);
+
+  printf("Radio configured.\n");
 #endif
 
   /* Prepare packet header for constructing packets */
@@ -133,34 +146,39 @@ void *radio_thread(void *arg) {
 
   /* Infinitely read sensors and send packets out */
 
-  for (;;) {
+  for (;;)
+    {
 
-    /* Reset packet for fresh construction */
+      /* Reset packet for fresh construction */
 
-    packet_init(&pkt, pkt_buf);
+      packet_init(&pkt, pkt_buf);
 
-    /* Add header to packet */
+      /* Add header to packet */
 
-    err = packet_append(&pkt, &pkt_hdr, sizeof(pkt_hdr));
+      err = packet_append(&pkt, &pkt_hdr, sizeof(pkt_hdr));
 
-    if (!err) {
-      fprintf(stderr, "Out of packet space!\n");
+      if (err)
+        {
+          fprintf(stderr, "Out of packet space!\n");
+        }
+
+      /* Read sensors until there's no more space TODO */
+
+      /* Send packet over radio */
+
+      printf("Transmitting...\n");
+      b_sent = write(radio, pkt.contents, pkt.len);
+      if (b_sent < 0)
+        {
+          fprintf(stderr, "Packet failed to send: %d\n", errno);
+          continue; /* Try a new packet */
+        }
+      printf("Transmitted\n");
+
+      /* Packet is complete, increment sequence number */
+
+      pkt_hdr.num++;
     }
-
-    /* Read sensors until there's no more space TODO */
-
-    /* Send packet over radio */
-
-    b_sent = write(radio, pkt.contents, pkt.len);
-    if (b_sent < 0) {
-      fprintf(stderr, "Packet failed to send: %d\n", errno);
-      continue; /* Try a new packet */
-    }
-
-    /* Packet is complete, increment sequence number */
-
-    pkt_hdr.num++;
-  }
 
   pthread_cleanup_pop(1); /* Close radio */
   return (void *)(long)err;

@@ -1,1 +1,8 @@
 *.o
+*.built
+*.dep
+*.depend
+.kconfig
+
+# Auto-generated Kconfig
+Kconfig
