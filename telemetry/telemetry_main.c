@@ -108,7 +108,7 @@ int main(int argc, FAR char *argv[])
   config.radio.prlen = 6;
   config.radio.frequency = 902000000;
   config.radio.spread = 7;
-  config.radio.txpower = 2.0f;
+  config.radio.txpower = 18.0f;
   config.radio.bandwidth = 125;
   memcpy(config.radio.callsign, "VA3INI", sizeof("VA3INI") - 1);
 
