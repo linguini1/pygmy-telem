@@ -115,7 +115,7 @@ int usb_init(void)
        */
 
       DEBUGASSERT(errno == ENOTCONN);
-      usleep(1000);
+      usleep(100);
     }
   while (usb_fd < 0);
 

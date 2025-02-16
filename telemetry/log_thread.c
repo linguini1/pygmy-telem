@@ -71,11 +71,14 @@ void *log_thread(void *arg)
           continue;
         }
 
-      err = fsync(pwrfs);
-      if (err < 0)
+      if (count % 100 == 0)
         {
-          err = errno;
-          fprintf(stderr, "Couldn't sync logfile: %d\n", err);
+          err = fsync(pwrfs);
+          if (err < 0)
+            {
+              err = errno;
+              fprintf(stderr, "Couldn't sync logfile: %d\n", err);
+            }
         }
 
       printf("Logged #%u.\n", count);
