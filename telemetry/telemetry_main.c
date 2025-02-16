@@ -33,6 +33,11 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#if defined(CONFIG_CDCACM)
+#include <nuttx/usb/cdcacm.h>
+#include <sys/boardctl.h>
+#endif
+
 #include "../common/configuration.h"
 
 /****************************************************************************
@@ -62,6 +67,41 @@ void *radio_thread(void *arg);
  ****************************************************************************/
 
 /****************************************************************************
+ * Name: usb_init
+ *
+ * Description:
+ *   Initialize USB device driver for console debug output.
+ ****************************************************************************/
+
+#if defined(CONFIG_CDCACM)
+int usb_init(void)
+{
+  struct boardioc_usbdev_ctrl_s ctrl;
+  FAR void *handle;
+  int ret;
+
+  /* Initialize architecture */
+
+  ret = boardctl(BOARDIOC_INIT, 0);
+  if (ret != 0)
+    {
+      fprintf(stderr, "Could not initialize board: %d\n", ret);
+      return ret;
+    }
+
+  /* Initialize the USB serial driver */
+
+  ctrl.usbdev = BOARDIOC_USBDEV_CDCACM;
+  ctrl.action = BOARDIOC_USBDEV_CONNECT;
+  ctrl.instance = 0;
+  ctrl.handle = &handle;
+
+  ret = boardctl(BOARDIOC_USBDEV_CONTROL, (uintptr_t)&ctrl);
+  return ret;
+}
+#endif
+
+/****************************************************************************
  * telemetry_main
  ****************************************************************************/
 
@@ -72,6 +112,14 @@ int main(int argc, FAR char *argv[])
   int configfile;
   ssize_t b_read;
   struct configuration_s config;
+
+#if defined(CONFIG_CDCACM)
+  err = usb_init();
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to initialize USB console: %d\n", err);
+    }
+#endif
 
   /* Read configuration data */
 
