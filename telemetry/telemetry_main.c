@@ -79,13 +79,13 @@ int usb_init(void)
   struct boardioc_usbdev_ctrl_s ctrl;
   FAR void *handle;
   int ret;
+  int usb_fd;
 
   /* Initialize architecture */
 
   ret = boardctl(BOARDIOC_INIT, 0);
   if (ret != 0)
     {
-      fprintf(stderr, "Could not initialize board: %d\n", ret);
       return ret;
     }
 
@@ -97,6 +97,42 @@ int usb_init(void)
   ctrl.handle = &handle;
 
   ret = boardctl(BOARDIOC_USBDEV_CONTROL, (uintptr_t)&ctrl);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+#if defined(CONFIG_CDCACM_CONSOLE)
+
+  /* Redirect standard streams to USB console */
+
+  do
+    {
+      usb_fd = open("/dev/ttyACM0", O_RDWR);
+
+      /* ENOTCONN means that the USB device is not yet connected, so sleep.
+       * Anything else is bad.
+       */
+
+      DEBUGASSERT(errno == ENOTCONN);
+      usleep(1000);
+    }
+  while (usb_fd < 0);
+
+  usb_fd = open("/dev/ttyACM0", O_RDWR);
+
+  dup2(usb_fd, 0);
+  dup2(usb_fd, 1);
+  dup2(usb_fd, 2);
+
+  dprintf(usb_fd, "This is a message!\n");
+
+  if (usb_fd > 2)
+    {
+      close(usb_fd);
+    }
+#endif /* CONFIG_CDCACM_CONSOLE */
+
   return ret;
 }
 #endif
