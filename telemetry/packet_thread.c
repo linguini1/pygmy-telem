@@ -70,22 +70,19 @@ void *packet_thread(void *arg)
       /* Add header to packet */
 
       err = packet_push(&pkt, &pkt_hdr, sizeof(pkt_hdr));
+      if (err)
+        {
+          fprintf(stderr, "Out of packet space!\n");
+        }
 
       /* Construct a packet from sensor data */
 
       for (;;)
         {
-          if (err)
-            {
-              fprintf(stderr, "Out of packet space!\n");
-            }
-
           /* Read sensors until there's no more space TODO */
 
           err = packet_push(&pkt, "Some data\n", sizeof("Some data\n"));
           usleep(100); // TODO: remove
-
-          /* Following packet_push() ... */
 
           if (err == ENOMEM)
             {

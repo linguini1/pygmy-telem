@@ -167,6 +167,8 @@ void *radio_thread(void *arg)
       /* Copy packet into local buffer to prevent hold up from transmit time
        */
 
+      // TODO: it seems packets here are much shorter than when they are
+      // published
       memcpy(local_packet.contents, pkt->contents, pkt->len);
       local_packet.len = pkt->len;
 
