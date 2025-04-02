@@ -83,7 +83,7 @@ void *packet_thread(void *arg)
           /* Read sensors until there's no more space TODO */
 
           err = packet_push(&pkt, "Some data\n", sizeof("Some data\n"));
-          usleep(10000);
+          usleep(100); // TODO: remove
 
           /* Following packet_push() ... */
 

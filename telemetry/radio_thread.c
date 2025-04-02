@@ -48,6 +48,15 @@
 
 static struct packet_s *pkt; /* Shared packet pointer */
 
+static uint8_t local_contents[256]; /* Packet contents local copy */
+
+/* Packet local copy */
+
+static struct packet_s local_packet = {
+    .contents = local_contents,
+    .len = 0,
+};
+
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
@@ -155,21 +164,26 @@ void *radio_thread(void *arg)
           continue;
         }
 
-      // TODO: copy packet to our own intermediate buffer so it's not locked
-      // for a long time
+      /* Copy packet into local buffer to prevent hold up from transmit time
+       */
+
+      memcpy(local_packet.contents, pkt->contents, pkt->len);
+      local_packet.len = pkt->len;
+
+      /* Mark transmitted once copied so we can relinquish mutex */
+
+      syncro_mark_transmitted(syncro);
 
       /* Send packet over radio */
 
       printf("Transmitting...\n");
-      b_sent = write(radio, pkt->contents, pkt->len);
+      b_sent = write(radio, local_packet.contents, local_packet.len);
       if (b_sent < 0)
         {
           fprintf(stderr, "Packet failed to send: %d\n", errno);
-          syncro_mark_transmitted(syncro);
           continue; /* Try a new packet */
         }
 
-      syncro_mark_transmitted(syncro);
       printf("Transmitted\n");
     }
 
