@@ -63,18 +63,18 @@ void *packet_thread(void *arg)
 
   for (;;)
     {
+      /* Reset packet for fresh construction */
+
+      packet_init(&pkt, pkt_buf);
+
+      /* Add header to packet */
+
+      err = packet_push(&pkt, &pkt_hdr, sizeof(pkt_hdr));
+
       /* Construct a packet from sensor data */
 
       for (;;)
         {
-          /* Reset packet for fresh construction */
-
-          packet_init(&pkt, pkt_buf);
-
-          /* Add header to packet */
-
-          err = packet_push(&pkt, &pkt_hdr, sizeof(pkt_hdr));
-
           if (err)
             {
               fprintf(stderr, "Out of packet space!\n");
@@ -83,6 +83,7 @@ void *packet_thread(void *arg)
           /* Read sensors until there's no more space TODO */
 
           err = packet_push(&pkt, "Some data\n", sizeof("Some data\n"));
+          usleep(10000);
 
           /* Following packet_push() ... */
 
@@ -94,6 +95,7 @@ void *packet_thread(void *arg)
 
       /* Share this packet with other threads using syncro monitor */
 
+      printf("Published packet\n");
       err = syncro_publish(syncro, &pkt);
       if (err)
         {

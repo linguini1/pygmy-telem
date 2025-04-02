@@ -78,6 +78,7 @@ void *log_thread(void *arg)
       /* Wait for unlogged packet */
 
       err = syncro_get_unlogged(syncro, &pkt);
+
       if (err)
         {
           fprintf(stderr, "Error getting shared packet: %d\n", err);

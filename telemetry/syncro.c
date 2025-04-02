@@ -4,6 +4,7 @@
 
 #include <pthread.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #include "../packets/packets.h"
 #include "syncro.h"
@@ -99,7 +100,7 @@ int syncro_get_unlogged(syncro_t *syncro, struct packet_s **pkt)
 
   /* Wait for change in packet status */
 
-  while (!syncro->logged)
+  while (syncro->logged)
     {
       pthread_cond_wait(&syncro->is_new, &syncro->lock);
     }
@@ -138,7 +139,7 @@ int syncro_get_untransmitted(syncro_t *syncro, struct packet_s **pkt)
 
   /* Wait for change in packet status */
 
-  while (!syncro->transmitted)
+  while (syncro->transmitted)
     {
       pthread_cond_wait(&syncro->is_new, &syncro->lock);
     }

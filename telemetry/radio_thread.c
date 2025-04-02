@@ -126,7 +126,7 @@ void *radio_thread(void *arg)
 
   /* Set operating transmission power */
 
-  err = ioctl(radio, WLIOC_SETTXPOWER, &config.txpower);
+  err = ioctl(radio, WLIOC_SETTXPOWERF, &config.txpower);
   ioctl_err_cancel("Couldn't set radio transmit power", err);
   printf("Radio transmit power set to %.2f\n", config.txpower);
 

@@ -135,6 +135,8 @@ int usb_init(void)
     {
       close(usb_fd);
     }
+  sleep(1); /* Seems to help ensure first few prints get captured */
+
 #endif /* CONFIG_CDCACM_CONSOLE */
 
   return ret;
