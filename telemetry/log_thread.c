@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "../packets/packets.h"
+#include "arguments.h"
 #include "syncro.h"
 
 /****************************************************************************
@@ -49,8 +50,7 @@ static void close_fd(void *arg) { close(*((int *)(arg))); }
 
 void *log_thread(void *arg)
 {
-  // TODO: unpack arguments
-  syncro_t *syncro = NULL;
+  syncro_t *syncro = args_syncro(arg);
 
   int err;
   int pwrfs;

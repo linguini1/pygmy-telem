@@ -36,7 +36,7 @@ int syncro_init(syncro_t *syncro)
   err = pthread_mutex_init(&syncro->lock, NULL);
   if (err) return err;
 
-  err = pthread_cond_init(&syncro->new_pkt, NULL);
+  err = pthread_cond_init(&syncro->is_new, NULL);
   return err;
 }
 

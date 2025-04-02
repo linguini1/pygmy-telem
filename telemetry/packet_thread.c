@@ -11,6 +11,7 @@
 
 #include "../common/configuration.h"
 #include "../packets/packets.h"
+#include "arguments.h"
 #include "syncro.h"
 
 /****************************************************************************
@@ -52,8 +53,8 @@ void *packet_thread(void *arg)
 
   /* Unpack arguments */
 
-  syncro_t *syncro = NULL;               /* TODO: unpack */
-  struct configuration_s *config = NULL; /* TODO: unpack */
+  syncro_t *syncro = args_syncro(arg);
+  struct configuration_s *config = args_config(arg);
 
   /* Prepare packet header for constructing packets */
 

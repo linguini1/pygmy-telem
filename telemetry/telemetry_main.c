@@ -39,6 +39,8 @@
 #endif
 
 #include "../common/configuration.h"
+#include "arguments.h"
+#include "syncro.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -54,6 +56,7 @@
 
 static pthread_t radio_pid;
 static pthread_t log_pid;
+static pthread_t packet_pid;
 
 /****************************************************************************
  * Public Function Prototypes
@@ -61,6 +64,7 @@ static pthread_t log_pid;
 
 void *log_thread(void *arg);
 void *radio_thread(void *arg);
+void *packet_thread(void *arg);
 
 /****************************************************************************
  * Public Functions
@@ -148,6 +152,11 @@ int main(int argc, FAR char *argv[])
   int configfile;
   ssize_t b_read;
   struct configuration_s config;
+  syncro_t syncro;
+  const struct thread_args_t args = {
+      .syncro = &syncro,
+      .config = &config,
+  };
 
 #if defined(CONFIG_CDCACM)
   err = usb_init();
@@ -196,11 +205,19 @@ int main(int argc, FAR char *argv[])
   config.radio.bandwidth = 125;
   memcpy(config.radio.callsign, "VA3INI", sizeof("VA3INI") - 1);
 
-  // TODO
+  /* Initialize synchronization object */
+
+  err = syncro_init(&syncro);
+  if (err)
+    {
+      fprintf(stderr, "Could not initialize synchronization object: %d\n",
+              err);
+      return EXIT_FAILURE;
+    }
 
   /* Start logging thread. */
 
-  err = pthread_create(&log_pid, NULL, log_thread, NULL);
+  err = pthread_create(&log_pid, NULL, log_thread, (void *)&args);
   if (err < 0)
     {
       fprintf(stderr, "Failed to start logging thread %d\n", err);
@@ -208,7 +225,15 @@ int main(int argc, FAR char *argv[])
 
   /* Start radio broadcast thread */
 
-  err = pthread_create(&radio_pid, NULL, radio_thread, &config.radio);
+  err = pthread_create(&radio_pid, NULL, radio_thread, (void *)&args);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to start radio thread: %d\n", err);
+    }
+
+  /* Start packet thread */
+
+  err = pthread_create(&packet_pid, NULL, packet_thread, (void *)&args);
   if (err < 0)
     {
       fprintf(stderr, "Failed to start radio thread: %d\n", err);
@@ -224,6 +249,12 @@ int main(int argc, FAR char *argv[])
   if (err)
     {
       fprintf(stderr, "Radio thread exited with error: %d\n", err);
+    }
+
+  pthread_join(packet_pid, (void *)&err);
+  if (err)
+    {
+      fprintf(stderr, "Packet thread exited with error: %d\n", err);
     }
 
   return EXIT_SUCCESS;

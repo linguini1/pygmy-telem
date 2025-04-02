@@ -11,6 +11,7 @@
 
 #include "../common/configuration.h"
 #include "../packets/packets.h"
+#include "arguments.h"
 #include "syncro.h"
 
 #ifdef CONFIG_LPWAN_RN2XX3
@@ -45,7 +46,7 @@
  * Private Data
  ****************************************************************************/
 
-struct packet_s *pkt; /* Shared packet pointer */
+static struct packet_s *pkt; /* Shared packet pointer */
 
 /****************************************************************************
  * Private Functions
@@ -67,9 +68,8 @@ static void close_fd(void *arg) { close(*(int *)(arg)); }
 
 void *radio_thread(void *arg)
 {
-
-  struct radio_config_s *config = (struct radio_config_s *)(arg);
-  syncro_t *syncro = NULL; /* TODO: unpack */
+  syncro_t *syncro = args_syncro(arg);
+  struct radio_config_s config = args_config(arg)->radio;
 
   int radio;
   int err;
@@ -96,39 +96,39 @@ void *radio_thread(void *arg)
 #ifdef CONFIG_LPWAN_RN2XX3
   /* Set operating frequency */
 
-  err = ioctl(radio, WLIOC_SETRADIOFREQ, config->frequency);
+  err = ioctl(radio, WLIOC_SETRADIOFREQ, config.frequency);
   ioctl_err_cancel("Couldn't set radio frequency", err);
-  printf("Radio frequency set to %lu Hz\n", config->frequency);
+  printf("Radio frequency set to %lu Hz\n", config.frequency);
 
   /* Set operating bandwidth */
 
-  err = ioctl(radio, WLIOC_SETBANDWIDTH, config->bandwidth);
+  err = ioctl(radio, WLIOC_SETBANDWIDTH, config.bandwidth);
   ioctl_err_cancel("Couldn't set radio bandwidth", err);
-  printf("Radio bandwidth set to %lu kHz\n", config->bandwidth);
+  printf("Radio bandwidth set to %lu kHz\n", config.bandwidth);
 
   /* Set operating preamble length */
 
-  err = ioctl(radio, WLIOC_SETPRLEN, config->prlen);
+  err = ioctl(radio, WLIOC_SETPRLEN, config.prlen);
   ioctl_err_cancel("Couldn't set radio preamble length", err);
-  printf("Radio preamble length set to %u\n", config->prlen);
+  printf("Radio preamble length set to %u\n", config.prlen);
 
   /* Set operating spread factor */
 
-  err = ioctl(radio, WLIOC_SETSPREAD, config->spread);
+  err = ioctl(radio, WLIOC_SETSPREAD, config.spread);
   ioctl_err_cancel("Couldn't set radio spread factor", err);
-  printf("Radio spread factor set to sf%u\n", config->spread);
+  printf("Radio spread factor set to sf%u\n", config.spread);
 
   /* Set operating modulation */
 
-  err = ioctl(radio, WLIOC_SETMOD, config->mod);
+  err = ioctl(radio, WLIOC_SETMOD, config.mod);
   ioctl_err_cancel("Couldn't set radio modulation", err);
-  printf("Radio modulation set to %u\n", config->mod);
+  printf("Radio modulation set to %u\n", config.mod);
 
   /* Set operating transmission power */
 
-  err = ioctl(radio, WLIOC_SETTXPOWER, &config->txpower);
+  err = ioctl(radio, WLIOC_SETTXPOWER, &config.txpower);
   ioctl_err_cancel("Couldn't set radio transmit power", err);
-  printf("Radio transmit power set to %.2f\n", config->txpower);
+  printf("Radio transmit power set to %.2f\n", config.txpower);
 
   printf("Radio configured.\n");
 #endif
