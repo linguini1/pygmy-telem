@@ -11,6 +11,7 @@
 
 #include "../common/configuration.h"
 #include "../packets/packets.h"
+#include "syncro.h"
 
 #ifdef CONFIG_LPWAN_RN2XX3
 #include <nuttx/wireless/lpwan/rn2xx3.h>
@@ -44,17 +45,7 @@
  * Private Data
  ****************************************************************************/
 
-/* Buffer for packet header construction */
-
-static struct packet_hdr_s pkt_hdr;
-
-/* Packet under construction */
-
-static struct packet_s pkt;
-
-/* Buffer for constructing packets */
-
-static uint8_t pkt_buf[CONFIG_PYGMY_PACKET_MAXLEN];
+struct packet_s *pkt; /* Shared packet pointer */
 
 /****************************************************************************
  * Private Functions
@@ -78,9 +69,12 @@ void *radio_thread(void *arg)
 {
 
   struct radio_config_s *config = (struct radio_config_s *)(arg);
+  syncro_t *syncro = NULL; /* TODO: unpack */
+
   int radio;
   int err;
   ssize_t b_sent;
+  pkt = NULL;
 
   /* Open radio file descriptor */
 
@@ -139,45 +133,43 @@ void *radio_thread(void *arg)
   printf("Radio configured.\n");
 #endif
 
-  /* Prepare packet header for constructing packets */
-
-  packet_header_init(&pkt_hdr, config->callsign, 0);
-  packet_init(&pkt, pkt_buf);
-
   /* Infinitely read sensors and send packets out */
 
   for (;;)
     {
 
-      /* Reset packet for fresh construction */
+      /* Wait for packet */
 
-      packet_init(&pkt, pkt_buf);
-
-      /* Add header to packet */
-
-      err = packet_append(&pkt, &pkt_hdr, sizeof(pkt_hdr));
-
+      err = syncro_get_untransmitted(syncro, &pkt);
       if (err)
         {
-          fprintf(stderr, "Out of packet space!\n");
+          fprintf(stderr, "Error getting packet: %d\n", err);
         }
 
-      /* Read sensors until there's no more space TODO */
+      /* If packet is NULL, release it and try again */
+
+      if (pkt == NULL)
+        {
+          fprintf(stderr, "Shared packet is NULL\n");
+          syncro_mark_transmitted(syncro);
+          continue;
+        }
 
       /* Send packet over radio */
 
       printf("Transmitting...\n");
-      b_sent = write(radio, pkt.contents, pkt.len);
+      // TODO: copy packet to our own intermediate buffer so it's not locked
+      // for a long time
+      b_sent = write(radio, pkt->contents, pkt->len);
       if (b_sent < 0)
         {
           fprintf(stderr, "Packet failed to send: %d\n", errno);
+          syncro_mark_transmitted(syncro);
           continue; /* Try a new packet */
         }
+
+      syncro_mark_transmitted(syncro);
       printf("Transmitted\n");
-
-      /* Packet is complete, increment sequence number */
-
-      pkt_hdr.num++;
     }
 
   pthread_cleanup_pop(1); /* Close radio */

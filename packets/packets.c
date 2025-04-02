@@ -29,7 +29,8 @@
  *
  ****************************************************************************/
 
-void packet_header_init(struct packet_hdr_s *hdr, char *callsign, uint8_t num) {
+void packet_header_init(struct packet_hdr_s *hdr, char *callsign, uint8_t num)
+{
   int len;
 
   hdr->num = num;
@@ -37,16 +38,18 @@ void packet_header_init(struct packet_hdr_s *hdr, char *callsign, uint8_t num) {
 
   /* If user callsign is less than maximum, 0 pad the rest */
 
-  if (len < CONFIG_PYGMY_CALLSIGN_LEN) {
-    memcpy(hdr->callsign, callsign, len);
-    memset(&hdr->callsign[len], 0, CONFIG_PYGMY_CALLSIGN_LEN - len);
-  }
+  if (len < CONFIG_PYGMY_CALLSIGN_LEN)
+    {
+      memcpy(hdr->callsign, callsign, len);
+      memset(&hdr->callsign[len], 0, CONFIG_PYGMY_CALLSIGN_LEN - len);
+    }
 
   /* Otherwise, truncate the call sign to the maximum */
 
-  else {
-    memcpy(hdr->callsign, callsign, CONFIG_PYGMY_CALLSIGN_LEN);
-  }
+  else
+    {
+      memcpy(hdr->callsign, callsign, CONFIG_PYGMY_CALLSIGN_LEN);
+    }
 }
 
 /****************************************************************************
@@ -60,13 +63,14 @@ void packet_header_init(struct packet_hdr_s *hdr, char *callsign, uint8_t num) {
  *
  ****************************************************************************/
 
-void packet_init(struct packet_s *pkt, void *buf) {
+void packet_init(struct packet_s *pkt, void *buf)
+{
   pkt->contents = buf;
   pkt->len = 0;
 }
 
 /****************************************************************************
- * Name: packet_append
+ * Name: packet_push
  *
  * Description:
  *   Append data to the radio packet.
@@ -82,10 +86,12 @@ void packet_init(struct packet_s *pkt, void *buf) {
  *
  ****************************************************************************/
 
-int packet_append(struct packet_s *pkt, const void *buf, size_t nbytes) {
-  if (pkt->len + nbytes > CONFIG_PYGMY_PACKET_MAXLEN) {
-    return ENOMEM;
-  }
+int packet_push(struct packet_s *pkt, const void *buf, size_t nbytes)
+{
+  if (pkt->len + nbytes > CONFIG_PYGMY_PACKET_MAXLEN)
+    {
+      return ENOMEM;
+    }
 
   memcpy(&pkt->contents[pkt->len], buf, nbytes);
   pkt->len += nbytes;
