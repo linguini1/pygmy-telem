@@ -82,6 +82,8 @@ void *packet_thread(void *arg)
 
           /* Read sensors until there's no more space TODO */
 
+          err = packet_push(&pkt, "Some data\n", sizeof("Some data\n"));
+
           /* Following packet_push() ... */
 
           if (err == ENOMEM)
@@ -97,6 +99,10 @@ void *packet_thread(void *arg)
         {
           fprintf(stderr, "Couldn't publish new packet: %d\n", err);
         }
+
+      /* Update packet sequence number */
+
+      pkt_hdr.num++;
     }
 
   return 0;

@@ -96,7 +96,7 @@ void *log_thread(void *arg)
       /* Log packet */
 
       printf("Logging #%u...\n", count);
-      b_written = dprintf(pwrfs, "Some data #%u\n", count);
+      b_written = write(pwrfs, pkt->contents, pkt->len);
       if (b_written <= 0)
         {
           err = errno;

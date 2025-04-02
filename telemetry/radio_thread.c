@@ -155,11 +155,12 @@ void *radio_thread(void *arg)
           continue;
         }
 
+      // TODO: copy packet to our own intermediate buffer so it's not locked
+      // for a long time
+
       /* Send packet over radio */
 
       printf("Transmitting...\n");
-      // TODO: copy packet to our own intermediate buffer so it's not locked
-      // for a long time
       b_sent = write(radio, pkt->contents, pkt->len);
       if (b_sent < 0)
         {
