@@ -9,6 +9,8 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#include <uORB/uORB.h>
+
 #include "../common/configuration.h"
 #include "../packets/packets.h"
 #include "arguments.h"
@@ -17,6 +19,8 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+#define deref(data, kind) (*((kind *)(data)))
 
 /****************************************************************************
  * Private Data
@@ -38,6 +42,10 @@ static uint8_t pkt_bufb[CONFIG_PYGMY_PACKET_MAXLEN];
 
 static struct packet_s *pkt_cur = &pkt_a;
 static struct packet_s *pkt_prev = &pkt_b;
+
+/* Buffer to store some sensor data temporarily */
+
+static uint8_t uorb_data[32];
 
 /****************************************************************************
  * Public Functions
@@ -70,6 +78,14 @@ void *packet_thread(void *arg)
   packet_init(&pkt_a, pkt_bufa);
   packet_init(&pkt_b, pkt_bufb);
 
+  /* Subscribe to sensors */
+
+  int baro_fd = orb_subscribe(orb_get_meta("sensor_baro"));
+  if (baro_fd < 0)
+    {
+      fprintf(stderr, "Failed to open sensor_baro: %d\n", errno);
+    }
+
   press_p pressure = {
       .time = 0,
       .press = 1012,
@@ -93,9 +109,20 @@ void *packet_thread(void *arg)
 
       for (;;)
         {
-          /* Read sensors until there's no more space TODO */
+          /* Read sensors until there's no more space */
 
-          pressure.time++;
+          err =
+              orb_copy_multi(baro_fd, uorb_data, sizeof(struct sensor_baro));
+          if (err < 0)
+            {
+              fprintf(stderr, "Couldn't get barometer data: %d\n", errno);
+            }
+
+          pressure.time =
+              deref(uorb_data, struct sensor_baro).timestamp * 1000;
+          pressure.press =
+              (int32_t)deref(uorb_data, struct sensor_baro).pressure * 100;
+
           err = packet_push_block(pkt_cur, PACKET_PRESS, &pressure,
                                   sizeof(pressure));
 
