@@ -24,6 +24,10 @@
 #define CONFIG_PYGMY_TELEM_USRFS "/usrfs"
 #endif
 
+#ifndef CONFIG_PYGYMY_NLOGSAVE
+#define CONFIG_PYGYMY_NLOGSAVE 5
+#endif
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -109,9 +113,9 @@ void *log_thread(void *arg)
 
       syncro_mark_logged(syncro);
 
-      /* Sync after 100 packets logged */
+      /* Sync after `n` packets logged */
 
-      if (count % 100 == 0)
+      if (count % CONFIG_PYGYMY_NLOGSAVE == 0)
         {
           err = fsync(pwrfs);
           if (err < 0)
