@@ -4,6 +4,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
@@ -20,7 +21,13 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define deref(data, kind) (*((kind *)(data)))
+/* Array length helper */
+
+#define array_len(arr) sizeof(arr) / sizeof((arr)[0])
+
+/* Sensor indexes */
+
+#define SENSOR_BARO 0
 
 /****************************************************************************
  * Private Data
@@ -50,6 +57,18 @@ static uint8_t block_buf[32];
 /* Buffer to store some sensor data temporarily */
 
 static uint8_t uorb_data[32];
+
+/* uORB sensor polling */
+
+struct pollfd fds[] = {
+    [SENSOR_BARO] = {.fd = -1, .events = POLLIN, .revents = 0},
+};
+
+/* uORB sensor metadata */
+
+struct orb_metadata const *metas[] = {
+    [SENSOR_BARO] = NULL,
+};
 
 /****************************************************************************
  * Public Functions
@@ -82,12 +101,19 @@ void *packet_thread(void *arg)
   packet_init(&pkt_a, pkt_bufa);
   packet_init(&pkt_b, pkt_bufb);
 
+  /* Get sensor metadata */
+
+  metas[SENSOR_BARO] = orb_get_meta("sensor_baro");
+
   /* Subscribe to sensors */
 
-  int baro_fd = orb_subscribe(orb_get_meta("sensor_baro"));
-  if (baro_fd < 0)
+  for (int i = 0; i < array_len(fds); i++)
     {
-      fprintf(stderr, "Failed to open sensor_baro: %d\n", errno);
+      fds[i].fd = orb_subscribe(metas[i]);
+      if (fds[i].fd < 0)
+        {
+          fprintf(stderr, "Failed to open sensor device: %d\n", errno);
+        }
     }
 
   for (;;)
@@ -108,38 +134,66 @@ void *packet_thread(void *arg)
 
       for (;;)
         {
-          /* Read sensors until there's no more space */
+          /* Read sensors until there's no more space in the current packet.
+           * Poll forever until some data is available */
 
-          err =
-              orb_copy_multi(baro_fd, uorb_data, sizeof(struct sensor_baro));
+          err = poll(fds, array_len(fds), -1);
+
           if (err < 0)
             {
-              continue; // TODO: remove when more sensors added
+              fprintf(stderr, "Error polling sensors: %d\n", errno);
+              continue;
             }
 
-          /* Pressure data */
+          /* Polling worked and we have some data to package */
 
-          block_init_pressure((void *)block_buf, (void *)uorb_data);
-          err = packet_push_block(pkt_cur, PACKET_PRESS, block_buf,
-                                  sizeof(press_p));
+          for (int i = 0; i < array_len(fds); i++)
+            {
+              /* Some data available on this sensor */
+
+              if (fds[i].revents & POLLIN)
+                {
+                  fds[i].revents = 0; /* Reset events */
+
+                  err = orb_copy(metas[i], fds[i].fd, uorb_data);
+                  if (err < 0)
+                    {
+                      fprintf(stderr, "Error copying uORB data: %d\n", err);
+                      continue;
+                    }
+
+                  /* We got some data, package it accordingly */
+
+                  // TODO: make packaging sensor dependent
+
+                  block_init_pressure((void *)block_buf, (void *)uorb_data);
+                  err = packet_push_block(pkt_cur, PACKET_PRESS, block_buf,
+                                          sizeof(press_p));
+                  if (err == ENOMEM) break; /* Exit collection loop */
+
+                  /* Temperature data */
+
+                  block_init_temp((void *)block_buf, (void *)uorb_data);
+                  err = packet_push_block(pkt_cur, PACKET_TEMP, block_buf,
+                                          sizeof(temp_p));
+                  if (err == ENOMEM) break;
+
+                  /* Accelerometer data TODO */
+
+                  /* Gyro data TODO */
+
+                  /* Magnetometer data TODO */
+
+                  /* Altitude data TODO */
+
+                  /* GPS data TODO */
+                }
+            }
+
+          /* We exited the collection loop after polling, if out of memory
+           * then break completely to finish this packet */
+
           if (err == ENOMEM) break;
-
-          /* Temperature data */
-
-          block_init_temp((void *)block_buf, (void *)uorb_data);
-          err = packet_push_block(pkt_cur, PACKET_TEMP, block_buf,
-                                  sizeof(temp_p));
-          if (err == ENOMEM) break;
-
-          /* Accelerometer data TODO */
-
-          /* Gyro data TODO */
-
-          /* Magnetometer data TODO */
-
-          /* Altitude data TODO */
-
-          /* GPS data TODO */
         }
 
       /* Share this packet with other threads using syncro monitor */
