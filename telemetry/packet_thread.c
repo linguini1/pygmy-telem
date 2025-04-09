@@ -118,10 +118,7 @@ void *packet_thread(void *arg)
               fprintf(stderr, "Couldn't get barometer data: %d\n", errno);
             }
 
-          pressure.time =
-              deref(uorb_data, struct sensor_baro).timestamp * 1000;
-          pressure.press =
-              (int32_t)deref(uorb_data, struct sensor_baro).pressure * 100;
+          block_init_pressure(&pressure, (struct sensor_baro *)uorb_data);
 
           err = packet_push_block(pkt_cur, PACKET_PRESS, &pressure,
                                   sizeof(pressure));

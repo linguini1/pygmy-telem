@@ -145,3 +145,21 @@ int packet_push_block(struct packet_s *pkt, const uint8_t kind,
   packet_push(pkt, block, nbytes);
   return 0;
 }
+
+/****************************************************************************
+ * Name: block_init_pressure
+ *
+ * Description:
+ *   Initialize a pressure block
+ *
+ * Arguments:
+ *  blk - The pressure block to initialize
+ *  data - The uORB pressure data to initialize with
+ *
+ ****************************************************************************/
+
+void block_init_pressure(press_p *blk, struct sensor_baro *data)
+{
+  blk->time = data->timestamp * 1000;
+  blk->press = (int32_t)data->pressure * 100;
+}
