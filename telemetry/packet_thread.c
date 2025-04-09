@@ -70,6 +70,11 @@ void *packet_thread(void *arg)
   packet_init(&pkt_a, pkt_bufa);
   packet_init(&pkt_b, pkt_bufb);
 
+  press_p pressure = {
+      .time = 0,
+      .press = 1012,
+  };
+
   for (;;)
     {
       /* Reset current packet for fresh construction */
@@ -90,7 +95,9 @@ void *packet_thread(void *arg)
         {
           /* Read sensors until there's no more space TODO */
 
-          err = packet_push(pkt_cur, "Some data\n", sizeof("Some data\n"));
+          pressure.time++;
+          err = packet_push_block(pkt_cur, PACKET_PRESS, &pressure,
+                                  sizeof(pressure));
 
           if (err == ENOMEM)
             {

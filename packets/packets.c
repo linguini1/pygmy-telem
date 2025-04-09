@@ -111,3 +111,37 @@ int packet_push(struct packet_s *pkt, const void *buf, size_t nbytes)
   pkt->len += nbytes;
   return 0;
 }
+
+/****************************************************************************
+ * Name: packet_push_block
+ *
+ * Description:
+ *   Append a block to the radio packet.
+ *
+ * Arguments:
+ *  pkt - The packet to append to
+ *  kind - The block type
+ *  block - The block to append
+ *  nbytes - The length of the block to append in bytes
+ *
+ * Returns:
+ *  0 on success, ENOMEM if insufficient space is available in the
+ *  packet.
+ *
+ ****************************************************************************/
+
+int packet_push_block(struct packet_s *pkt, const uint8_t kind,
+                      const void *block, size_t nbytes)
+{
+  if (pkt->len + nbytes + sizeof(kind) > CONFIG_PYGMY_PACKET_MAXLEN)
+    {
+      return ENOMEM;
+    }
+
+  /* NOTE: cannot get to this point if there isn't enough room left, so errors
+   * can be ignored */
+
+  packet_push(pkt, &kind, sizeof(kind));
+  packet_push(pkt, block, nbytes);
+  return 0;
+}

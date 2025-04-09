@@ -99,5 +99,7 @@ void packet_reset(struct packet_s *pkt);
 void packet_header_init(struct packet_hdr_s *hdr, char *callsign,
                         uint8_t num);
 int packet_push(struct packet_s *pkt, const void *buf, size_t nbytes);
+int packet_push_block(struct packet_s *pkt, const uint8_t kind,
+                      const void *block, size_t nbytes);
 
 #endif /* _PYGMY_PACKET_H_ */
