@@ -114,7 +114,7 @@ void *packet_thread(void *arg)
               orb_copy_multi(baro_fd, uorb_data, sizeof(struct sensor_baro));
           if (err < 0)
             {
-              fprintf(stderr, "Couldn't get barometer data: %d\n", errno);
+              continue; // TODO: remove when more sensors added
             }
 
           /* Pressure data */

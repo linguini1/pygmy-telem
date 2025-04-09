@@ -50,6 +50,18 @@
 #define CONFIG_PYGMY_TELEM_CONFIGFILE "/eeprom"
 #endif
 
+#ifndef PYGMY_LOG_THREAD_PRIORITY
+#define PYGMY_LOG_THREAD_PRIORITY 100
+#endif
+
+#ifndef PYGMY_RADIO_THREAD_PRIORITY
+#define PYGMY_RADIO_THREAD_PRIORITY 100
+#endif
+
+#ifndef PYGMY_PACKET_THREAD_PRIORITY
+#define PYGMY_PACKET_THREAD_PRIORITY 100
+#endif
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -217,12 +229,32 @@ int main(int argc, FAR char *argv[])
       return EXIT_FAILURE;
     }
 
+  /* Start packet thread */
+
+  err = pthread_create(&packet_pid, NULL, packet_thread, (void *)&args);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to start radio thread: %d\n", err);
+    }
+
+  err = pthread_setschedprio(packet_pid, PYGMY_PACKET_THREAD_PRIORITY);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to set priority of packet thread: %d\n", err);
+    }
+
   /* Start logging thread. */
 
   err = pthread_create(&log_pid, NULL, log_thread, (void *)&args);
   if (err < 0)
     {
       fprintf(stderr, "Failed to start logging thread %d\n", err);
+    }
+
+  err = pthread_setschedprio(log_pid, PYGMY_LOG_THREAD_PRIORITY);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to set priority of logging thread: %d\n", err);
     }
 
   /* Start radio broadcast thread */
@@ -233,12 +265,10 @@ int main(int argc, FAR char *argv[])
       fprintf(stderr, "Failed to start radio thread: %d\n", err);
     }
 
-  /* Start packet thread */
-
-  err = pthread_create(&packet_pid, NULL, packet_thread, (void *)&args);
+  err = pthread_setschedprio(radio_pid, PYGMY_RADIO_THREAD_PRIORITY);
   if (err < 0)
     {
-      fprintf(stderr, "Failed to start radio thread: %d\n", err);
+      fprintf(stderr, "Failed to set priority of radio thread: %d\n", err);
     }
 
   pthread_join(log_pid, (void *)&err);
