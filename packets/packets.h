@@ -95,6 +95,7 @@ typedef struct
  ****************************************************************************/
 
 void packet_init(struct packet_s *pkt, void *buf);
+void packet_reset(struct packet_s *pkt);
 void packet_header_init(struct packet_hdr_s *hdr, char *callsign,
                         uint8_t num);
 int packet_push(struct packet_s *pkt, const void *buf, size_t nbytes);

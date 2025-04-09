@@ -28,11 +28,16 @@ static struct packet_hdr_s pkt_hdr;
 
 /* Packet under construction */
 
-static struct packet_s pkt;
+static struct packet_s pkt_a;
+static struct packet_s pkt_b;
 
 /* Buffer for constructing packets */
 
-static uint8_t pkt_buf[CONFIG_PYGMY_PACKET_MAXLEN];
+static uint8_t pkt_bufa[CONFIG_PYGMY_PACKET_MAXLEN];
+static uint8_t pkt_bufb[CONFIG_PYGMY_PACKET_MAXLEN];
+
+static struct packet_s *pkt_cur = &pkt_a;
+static struct packet_s *pkt_prev = &pkt_b;
 
 /****************************************************************************
  * Public Functions
@@ -59,17 +64,22 @@ void *packet_thread(void *arg)
   /* Prepare packet header for constructing packets */
 
   packet_header_init(&pkt_hdr, config->radio.callsign, 0);
-  packet_init(&pkt, pkt_buf);
+
+  /* Prepare packets for construction */
+
+  packet_init(&pkt_a, pkt_bufa);
+  packet_init(&pkt_b, pkt_bufb);
 
   for (;;)
     {
-      /* Reset packet for fresh construction */
+      /* Reset current packet for fresh construction */
 
-      packet_init(&pkt, pkt_buf);
+      packet_reset(pkt_cur);
+      printf("Initialized: %p\n", pkt_cur);
 
       /* Add header to packet */
 
-      err = packet_push(&pkt, &pkt_hdr, sizeof(pkt_hdr));
+      err = packet_push(pkt_cur, &pkt_hdr, sizeof(pkt_hdr));
       if (err)
         {
           fprintf(stderr, "Out of packet space!\n");
@@ -81,11 +91,13 @@ void *packet_thread(void *arg)
         {
           /* Read sensors until there's no more space TODO */
 
-          err = packet_push(&pkt, "Some data\n", sizeof("Some data\n"));
+          err = packet_push(pkt_cur, "Some data\n", sizeof("Some data\n"));
           usleep(100); // TODO: remove
 
           if (err == ENOMEM)
             {
+              printf("Out of memory in: %p\n", pkt_cur);
+              printf("Size: %zu\n", pkt_cur->len);
               break;
             }
         }
@@ -93,11 +105,18 @@ void *packet_thread(void *arg)
       /* Share this packet with other threads using syncro monitor */
 
       printf("Published packet\n");
-      err = syncro_publish(syncro, &pkt);
+      err = syncro_publish(syncro, pkt_cur);
       if (err)
         {
           fprintf(stderr, "Couldn't publish new packet: %d\n", err);
         }
+
+      /* Swap to already consumed packet buffer for next iteration */
+
+      struct packet_s *tmp = pkt_cur;
+      pkt_cur = pkt_prev;
+      pkt_prev = tmp;
+      printf("Swapped!\n");
 
       /* Update packet sequence number */
 

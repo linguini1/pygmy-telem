@@ -59,6 +59,7 @@ void packet_header_init(struct packet_hdr_s *hdr, char *callsign, uint8_t num)
  *   Initialize a radio packet.
  *
  * Arguments:
+ *   pkt - The packet to initialize
  *   buf - A buffer of at least `CONFIG_PYGMY_PACKET_MAXLEN` bytes.
  *
  ****************************************************************************/
@@ -68,6 +69,19 @@ void packet_init(struct packet_s *pkt, void *buf)
   pkt->contents = buf;
   pkt->len = 0;
 }
+
+/****************************************************************************
+ * Name: packet_reset
+ *
+ * Description:
+ *   Resets a radio packet for more writing.
+ *
+ * Arguments:
+ *   pkt - The packet to reset
+ *
+ ****************************************************************************/
+
+void packet_reset(struct packet_s *pkt) { pkt->len = 0; }
 
 /****************************************************************************
  * Name: packet_push
