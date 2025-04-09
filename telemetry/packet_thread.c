@@ -116,6 +116,14 @@ void *packet_thread(void *arg)
         }
     }
 
+  /* Set sensor frequencies TODO */
+
+  err = orb_set_frequency(fds[SENSOR_BARO].fd, 50);
+  if (err < 0)
+    {
+      fprintf(stderr, "Couldn't set barometer frequency.");
+    }
+
   for (;;)
     {
       /* Reset current packet for fresh construction */
@@ -132,6 +140,7 @@ void *packet_thread(void *arg)
 
       /* Construct a packet from sensor data */
 
+      printf("Packet constructing\n");
       for (;;)
         {
           /* Read sensors until there's no more space in the current packet.
@@ -198,6 +207,7 @@ void *packet_thread(void *arg)
 
       /* Share this packet with other threads using syncro monitor */
 
+      printf("Packet publishing\n");
       err = syncro_publish(syncro, pkt_cur);
       if (err)
         {
