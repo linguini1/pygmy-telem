@@ -105,5 +105,6 @@ int packet_push_block(struct packet_s *pkt, const uint8_t kind,
                       const void *block, size_t nbytes);
 
 void block_init_pressure(press_p *blk, struct sensor_baro *data);
+void block_init_temp(temp_p *blk, struct sensor_baro *data);
 
 #endif /* _PYGMY_PACKET_H_ */

@@ -43,6 +43,10 @@ static uint8_t pkt_bufb[CONFIG_PYGMY_PACKET_MAXLEN];
 static struct packet_s *pkt_cur = &pkt_a;
 static struct packet_s *pkt_prev = &pkt_b;
 
+/* Buffer to store blocks under construction temporarily */
+
+static uint8_t block_buf[32];
+
 /* Buffer to store some sensor data temporarily */
 
 static uint8_t uorb_data[32];
@@ -86,11 +90,6 @@ void *packet_thread(void *arg)
       fprintf(stderr, "Failed to open sensor_baro: %d\n", errno);
     }
 
-  press_p pressure = {
-      .time = 0,
-      .press = 1012,
-  };
-
   for (;;)
     {
       /* Reset current packet for fresh construction */
@@ -118,15 +117,29 @@ void *packet_thread(void *arg)
               fprintf(stderr, "Couldn't get barometer data: %d\n", errno);
             }
 
-          block_init_pressure(&pressure, (struct sensor_baro *)uorb_data);
+          /* Pressure data */
 
-          err = packet_push_block(pkt_cur, PACKET_PRESS, &pressure,
-                                  sizeof(pressure));
+          block_init_pressure((void *)block_buf, (void *)uorb_data);
+          err = packet_push_block(pkt_cur, PACKET_PRESS, block_buf,
+                                  sizeof(press_p));
+          if (err == ENOMEM) break;
 
-          if (err == ENOMEM)
-            {
-              break;
-            }
+          /* Temperature data */
+
+          block_init_temp((void *)block_buf, (void *)uorb_data);
+          err = packet_push_block(pkt_cur, PACKET_TEMP, block_buf,
+                                  sizeof(temp_p));
+          if (err == ENOMEM) break;
+
+          /* Accelerometer data TODO */
+
+          /* Gyro data TODO */
+
+          /* Magnetometer data TODO */
+
+          /* Altitude data TODO */
+
+          /* GPS data TODO */
         }
 
       /* Share this packet with other threads using syncro monitor */

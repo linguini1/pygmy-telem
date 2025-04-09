@@ -161,5 +161,23 @@ int packet_push_block(struct packet_s *pkt, const uint8_t kind,
 void block_init_pressure(press_p *blk, struct sensor_baro *data)
 {
   blk->time = data->timestamp * 1000;
-  blk->press = (int32_t)data->pressure * 100;
+  blk->press = (int32_t)(data->pressure * 100.0f);
+}
+
+/****************************************************************************
+ * Name: block_init_temp
+ *
+ * Description:
+ *   Initialize a temperature block
+ *
+ * Arguments:
+ *  blk - The temperature block to initialize
+ *  data - The uORB temperature data to initialize with
+ *
+ ****************************************************************************/
+
+void block_init_temp(temp_p *blk, struct sensor_baro *data)
+{
+  blk->time = data->timestamp * 1000;
+  blk->temp = (int32_t)(data->temperature * 1000.0f);
 }
