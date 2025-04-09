@@ -75,7 +75,6 @@ void *packet_thread(void *arg)
       /* Reset current packet for fresh construction */
 
       packet_reset(pkt_cur);
-      printf("Initialized: %p\n", pkt_cur);
 
       /* Add header to packet */
 
@@ -92,19 +91,15 @@ void *packet_thread(void *arg)
           /* Read sensors until there's no more space TODO */
 
           err = packet_push(pkt_cur, "Some data\n", sizeof("Some data\n"));
-          usleep(100); // TODO: remove
 
           if (err == ENOMEM)
             {
-              printf("Out of memory in: %p\n", pkt_cur);
-              printf("Size: %zu\n", pkt_cur->len);
               break;
             }
         }
 
       /* Share this packet with other threads using syncro monitor */
 
-      printf("Published packet\n");
       err = syncro_publish(syncro, pkt_cur);
       if (err)
         {
@@ -116,7 +111,6 @@ void *packet_thread(void *arg)
       struct packet_s *tmp = pkt_cur;
       pkt_cur = pkt_prev;
       pkt_prev = tmp;
-      printf("Swapped!\n");
 
       /* Update packet sequence number */
 
