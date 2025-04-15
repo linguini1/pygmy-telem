@@ -55,8 +55,10 @@ typedef enum
   PACKET_PRESS = 0x0, /* Pressure in Pa */
   PACKET_TEMP = 0x1,  /* Temperature in millidegrees C */
   PACKET_ALT = 0x2,   /* Altitude in centimetres */
-  PACKET_COORD =
-      0x3, /* Coordinates (lat/long) in 0.1 micro degrees (10^-7) */
+  PACKET_COORD = 0x3, /* Coordinates in 0.1 micro degrees (10^-7) */
+  PACKET_ACCEL = 0x4, /* Linear acceleration in cm/s^2 */
+  PACKET_GYRO = 0x5,  /* Angular velocity in 0.1dps */
+  PACKET_MAG = 0x6,   /* Magnetic field in 0.1 uTesla */
 } pkt_kind_e;
 
 /* Coordinate packet */
@@ -92,6 +94,36 @@ typedef struct
   int32_t alt;     /* Altitude in centimetres */
 } PACKED alt_p;
 
+/* Acceleration packet */
+
+typedef struct
+{
+  pkt_time_t time; /* Mission time */
+  int16_t x;       /* Acceleration in x in cm/s^2 */
+  int16_t y;       /* Acceleration in y in cm/s^2 */
+  int16_t z;       /* Acceleration in z in cm/s^2 */
+} PACKED accel_p;
+
+/* Gyroscope packet */
+
+typedef struct
+{
+  pkt_time_t time; /* Mission time */
+  int16_t x;       /* Angular velocity in x in 0.1dps */
+  int16_t y;       /* Angular velocity in y in 0.1dps */
+  int16_t z;       /* Angular velocity in z in 0.1dps */
+} PACKED gyro_p;
+
+/* Magnetometer packet */
+
+typedef struct
+{
+  pkt_time_t time; /* Mission time */
+  int16_t x;       /* Magnetic field in x in 0.1uT */
+  int16_t y;       /* Magnetic field in y in 0.1uT */
+  int16_t z;       /* Magnetic field in z in 0.1uT */
+} PACKED mag_p;
+
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
@@ -106,5 +138,8 @@ int packet_push_block(struct packet_s *pkt, const uint8_t kind,
 
 void block_init_pressure(press_p *blk, struct sensor_baro *data);
 void block_init_temp(temp_p *blk, struct sensor_baro *data);
+void block_init_accel(accel_p *blk, struct sensor_accel *data);
+void block_init_gyro(gyro_p *blk, struct sensor_gyro *data);
+void block_init_mag(mag_p *blk, struct sensor_mag *data);
 
 #endif /* _PYGMY_PACKET_H_ */
