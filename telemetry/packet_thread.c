@@ -271,8 +271,7 @@ void *packet_thread(void *arg)
       printf("Packet constructing\n");
       for (;;)
         {
-          /* Read sensors until there's no more space in the current packet.
-           * Poll forever until some data is available */
+          /* Poll forever until some data is available */
 
           err = poll(fds, array_len(fds), -1);
 
@@ -302,35 +301,38 @@ void *packet_thread(void *arg)
                   /* Package according to sensor */
 
                   err = package_uorb(i, uorb_data, block_buf);
-                  if (err == ENOMEM) break; /* Out of packet space */
+
+                  /* Out of packet space, stop reading this set of poll events
+                   */
+                  if (err == ENOMEM) break;
                 }
-
-              /* We exited the collection loop after polling, if out of memory
-               * then break completely to finish this packet */
-
-              if (err == ENOMEM) break;
             }
 
-          /* Share this packet with other threads using syncro monitor */
+          /* We exited the collection loop after polling, if out of memory in
+           * this packet then break completely to finish it */
 
-          printf("Packet publishing\n");
-          err = syncro_publish(syncro, pkt_cur);
-          if (err)
-            {
-              fprintf(stderr, "Couldn't publish new packet: %d\n", err);
-            }
-
-          /* Swap to already consumed packet buffer for next iteration */
-
-          struct packet_s *tmp = pkt_cur;
-          pkt_cur = pkt_prev;
-          pkt_prev = tmp;
-
-          /* Update packet sequence number */
-
-          pkt_hdr.num++;
+          if (err == ENOMEM) break;
         }
 
-      return 0;
+      /* Share this packet with other threads using syncro monitor */
+
+      printf("Packet publishing\n");
+      err = syncro_publish(syncro, pkt_cur);
+      if (err)
+        {
+          fprintf(stderr, "Couldn't publish new packet: %d\n", err);
+        }
+
+      /* Swap to already consumed packet buffer for next iteration */
+
+      struct packet_s *tmp = pkt_cur;
+      pkt_cur = pkt_prev;
+      pkt_prev = tmp;
+
+      /* Update packet sequence number */
+
+      pkt_hdr.num++;
     }
+
+  return 0;
 }
