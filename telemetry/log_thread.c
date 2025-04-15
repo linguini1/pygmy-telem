@@ -25,7 +25,7 @@
 #endif
 
 #ifndef CONFIG_PYGYMY_NLOGSAVE
-#define CONFIG_PYGYMY_NLOGSAVE 10
+#define CONFIG_PYGYMY_NLOGSAVE 20
 #endif
 
 /****************************************************************************
