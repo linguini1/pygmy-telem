@@ -27,10 +27,19 @@
 
 /* Sensor indexes */
 
-#define SENSOR_BARO 0
-#define SENSOR_ACCEL 1
-#define SENSOR_GYRO 2
-#define SENSOR_MAG 3
+enum sensor_kind
+{
+#ifdef CONFIG_SENSORS_MS56XX
+  SENSOR_BARO,
+#endif
+#ifdef CONFIG_SENSORS_LSM6DSO32
+  SENSOR_ACCEL,
+  SENSOR_GYRO,
+#endif
+#ifdef CONFIG_SENSORS_LIS2MDL
+  SENSOR_MAG,
+#endif
+};
 
 /* Sensor sampling frequencies (Hz) */
 
@@ -120,7 +129,7 @@ static const uint32_t frequencies[] = {
  * @param block_buf The buffer to use to put the block in
  * @return 0 on success, ENOMEM on no more packet space
  */
-int package_uorb(int sensor, void *uorb_data, void *block_buf)
+int package_uorb(enum sensor_kind sensor, void *uorb_data, void *block_buf)
 {
   int err;
 
@@ -171,8 +180,6 @@ int package_uorb(int sensor, void *uorb_data, void *block_buf)
             packet_push_block(pkt_cur, PACKET_MAG, block_buf, sizeof(mag_p));
         break;
       }
-    default:
-      return 0; /* Unexpected sensor type, just skip */
     }
 
   /* GPS data TODO */
@@ -209,10 +216,16 @@ void *packet_thread(void *arg)
 
   /* Get sensor metadata */
 
+#ifdef CONFIG_SENSORS_MS56XX
   metas[SENSOR_BARO] = orb_get_meta("sensor_baro");
+#endif
+#ifdef CONFIG_SENSORS_LSM6DSO32
   metas[SENSOR_ACCEL] = orb_get_meta("sensor_accel");
   metas[SENSOR_GYRO] = orb_get_meta("sensor_gyro");
+#endif
+#ifdef CONFIG_SENSORS_LIS2MDL
   metas[SENSOR_MAG] = orb_get_meta("sensor_mag");
+#endif
 
   /* Subscribe to all sensors */
 
