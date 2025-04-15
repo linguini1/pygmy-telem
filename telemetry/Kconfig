@@ -57,4 +57,33 @@ config PYGMY_TELEM_CONFIGFILE
     ---help---
         The path to the user configuration file.
 
+config PYGMY_BARO_FREQ
+    int "Barometer sample frequency (Hz)"
+    depends on CONFIG_SENSORS_MS56XX
+    default 25
+
+config PYGMY_ACCEL_FREQ
+    int "Accelerometer sample frequency (Hz)"
+    depends on CONFIG_SENSORS_LSM6DSO32
+    default 50
+
+config PYGMY_GYRO_FREQ
+    int "Gyroscope sample frequency (Hz)"
+    depends on CONFIG_SENSORS_LSM6DSO32
+    default 50
+
+config PYGMY_MAG_FREQ
+    int "Magnetometer sample frequency (Hz)"
+    depends on CONFIG_SENSORS_LIS2MDL
+    default 50
+
+config PYGMY_NLOGSAVE
+    int "Log save interval"
+    default 20
+    ---help---
+        It takes some time to save the logs to littlefs when flushed, so flush
+        calls should be limited. However, if power is lost between flushes, all
+        unflushed logs are lost. The user can decide after how many logs to
+        flush.
+
 endif

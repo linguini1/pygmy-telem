@@ -39,6 +39,8 @@
 #endif
 
 #include "../common/configuration.h"
+#include "arguments.h"
+#include "syncro.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -48,12 +50,25 @@
 #define CONFIG_PYGMY_TELEM_CONFIGFILE "/eeprom"
 #endif
 
+#ifndef PYGMY_LOG_THREAD_PRIORITY
+#define PYGMY_LOG_THREAD_PRIORITY 130
+#endif
+
+#ifndef PYGMY_RADIO_THREAD_PRIORITY
+#define PYGMY_RADIO_THREAD_PRIORITY 90
+#endif
+
+#ifndef PYGMY_PACKET_THREAD_PRIORITY
+#define PYGMY_PACKET_THREAD_PRIORITY 100
+#endif
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
 
 static pthread_t radio_pid;
 static pthread_t log_pid;
+static pthread_t packet_pid;
 
 /****************************************************************************
  * Public Function Prototypes
@@ -61,6 +76,7 @@ static pthread_t log_pid;
 
 void *log_thread(void *arg);
 void *radio_thread(void *arg);
+void *packet_thread(void *arg);
 
 /****************************************************************************
  * Public Functions
@@ -131,6 +147,8 @@ int usb_init(void)
     {
       close(usb_fd);
     }
+  sleep(1); /* Seems to help ensure first few prints get captured */
+
 #endif /* CONFIG_CDCACM_CONSOLE */
 
   return ret;
@@ -148,6 +166,11 @@ int main(int argc, FAR char *argv[])
   int configfile;
   ssize_t b_read;
   struct configuration_s config;
+  syncro_t syncro;
+  const struct thread_args_t args = {
+      .syncro = &syncro,
+      .config = &config,
+  };
 
 #if defined(CONFIG_CDCACM)
   err = usb_init();
@@ -196,22 +219,56 @@ int main(int argc, FAR char *argv[])
   config.radio.bandwidth = 125;
   memcpy(config.radio.callsign, "VA3INI", sizeof("VA3INI") - 1);
 
-  // TODO
+  /* Initialize synchronization object */
+
+  err = syncro_init(&syncro);
+  if (err)
+    {
+      fprintf(stderr, "Could not initialize synchronization object: %d\n",
+              err);
+      return EXIT_FAILURE;
+    }
+
+  /* Start packet thread */
+
+  err = pthread_create(&packet_pid, NULL, packet_thread, (void *)&args);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to start radio thread: %d\n", err);
+    }
+
+  err = pthread_setschedprio(packet_pid, PYGMY_PACKET_THREAD_PRIORITY);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to set priority of packet thread: %d\n", err);
+    }
 
   /* Start logging thread. */
 
-  err = pthread_create(&log_pid, NULL, log_thread, NULL);
+  err = pthread_create(&log_pid, NULL, log_thread, (void *)&args);
   if (err < 0)
     {
       fprintf(stderr, "Failed to start logging thread %d\n", err);
     }
 
+  err = pthread_setschedprio(log_pid, PYGMY_LOG_THREAD_PRIORITY);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to set priority of logging thread: %d\n", err);
+    }
+
   /* Start radio broadcast thread */
 
-  err = pthread_create(&radio_pid, NULL, radio_thread, &config.radio);
+  err = pthread_create(&radio_pid, NULL, radio_thread, (void *)&args);
   if (err < 0)
     {
       fprintf(stderr, "Failed to start radio thread: %d\n", err);
+    }
+
+  err = pthread_setschedprio(radio_pid, PYGMY_RADIO_THREAD_PRIORITY);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to set priority of radio thread: %d\n", err);
     }
 
   pthread_join(log_pid, (void *)&err);
@@ -224,6 +281,12 @@ int main(int argc, FAR char *argv[])
   if (err)
     {
       fprintf(stderr, "Radio thread exited with error: %d\n", err);
+    }
+
+  pthread_join(packet_pid, (void *)&err);
+  if (err)
+    {
+      fprintf(stderr, "Packet thread exited with error: %d\n", err);
     }
 
   return EXIT_SUCCESS;
