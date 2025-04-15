@@ -3,6 +3,7 @@
  ****************************************************************************/
 
 #include <errno.h>
+#include <math.h>
 #include <string.h>
 
 #include "../packets/packets.h"
@@ -13,7 +14,8 @@
 
 #define us_to_ms(us) ((us) / 1000)
 
-#define RADS_TO_DEG (180.0f / 3.141592653f)
+#define RADS_TO_DEG (180.0f / M_PI)
+#define PRESS_SEA_LVL 101325
 
 /****************************************************************************
  * Private Functions
@@ -158,7 +160,7 @@ int packet_push_block(struct packet_s *pkt, const uint8_t kind,
  *
  * Arguments:
  *  blk - The pressure block to initialize
- *  data - The uORB pressure data to initialize with
+ *  data - The uORB barometric data to initialize with
  *
  ****************************************************************************/
 
@@ -176,7 +178,7 @@ void block_init_pressure(press_p *blk, struct sensor_baro *data)
  *
  * Arguments:
  *  blk - The temperature block to initialize
- *  data - The uORB temperature data to initialize with
+ *  data - The uORB barometric data to initialize with
  *
  ****************************************************************************/
 
@@ -184,6 +186,37 @@ void block_init_temp(temp_p *blk, struct sensor_baro *data)
 {
   blk->time = us_to_ms(data->timestamp);
   blk->temp = (int32_t)(data->temperature * 1000.0f);
+}
+
+/****************************************************************************
+ * Name: block_init_alt
+ *
+ * Description:
+ *   Initialize a altitude block
+ *
+ * Arguments:
+ *  blk - The altitude block to initialize
+ *  data - The uORB barometric data to initialize with
+ *
+ ****************************************************************************/
+
+void block_init_alt(alt_p *blk, struct sensor_baro *data)
+{
+  blk->time = us_to_ms(data->timestamp);
+
+  /*
+   * Derivation from pressure at altitude above sea level.
+   * p/101325 = (1 - 2.25577 × 10-5 h)^5.25588
+   * ln(p/101325) = 5.25588ln(1 - 2.25577 × 10-5 h)
+   * ln(p/101325) / 5.25588 = ln(1 - 2.25577 × 10-5 h)
+   * e^(ln(p/101325) / 5.25588) = 1 - 2.25577 × 10-5 h
+   * 1 - e^(ln(p/101325) / 5.25588) = 2.25577 × 10-5 h
+   *
+   * (1 - e^(ln(p/101325) / 5.25588)) / 2.25577 × 10-5 = h
+   */
+
+  double exponent = log(data->pressure * 100 / PRESS_SEA_LVL) / 5.22588;
+  blk->alt = (1 - pow(M_E, exponent)) / (2.255577e-5);
 }
 
 /****************************************************************************

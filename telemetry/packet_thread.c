@@ -149,7 +149,11 @@ int package_uorb(enum sensor_kind sensor, void *data, void *buf)
         err = packet_push_block(pkt_cur, PACKET_TEMP, buf, sizeof(temp_p));
         if (err == ENOMEM) break;
 
-        /* Altitude data TODO */
+        /* Altitude data */
+
+        block_init_alt(buf, data);
+        err = packet_push_block(pkt_cur, PACKET_ALT, buf, sizeof(alt_p));
+        if (err == ENOMEM) break;
       }
     case SENSOR_ACCEL:
       {

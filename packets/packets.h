@@ -138,6 +138,7 @@ int packet_push_block(struct packet_s *pkt, const uint8_t kind,
 
 void block_init_pressure(press_p *blk, struct sensor_baro *data);
 void block_init_temp(temp_p *blk, struct sensor_baro *data);
+void block_init_alt(alt_p *blk, struct sensor_baro *data);
 void block_init_accel(accel_p *blk, struct sensor_accel *data);
 void block_init_gyro(gyro_p *blk, struct sensor_gyro *data);
 void block_init_mag(mag_p *blk, struct sensor_mag *data);
