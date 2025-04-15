@@ -125,13 +125,13 @@ static const uint32_t frequencies[] = {
  * WARNING: modifies `pkt_cur`, global within this thread
  *
  * @param sensor The sensor which the data came from
- * @param uorb_data The data read from the sensor
- * @param block_buf The buffer to use to put the block in
+ * @param data The data read from the sensor
+ * @param buf The buffer to use to put the block in
  * @return 0 on success, ENOMEM on no more packet space
  */
-int package_uorb(enum sensor_kind sensor, void *uorb_data, void *block_buf)
+int package_uorb(enum sensor_kind sensor, void *data, void *buf)
 {
-  int err;
+  int err = 0;
 
   switch (sensor)
     {
@@ -139,16 +139,14 @@ int package_uorb(enum sensor_kind sensor, void *uorb_data, void *block_buf)
       {
         /* Pressure data */
 
-        block_init_pressure(block_buf, uorb_data);
-        err = packet_push_block(pkt_cur, PACKET_PRESS, block_buf,
-                                sizeof(press_p));
+        block_init_pressure(buf, data);
+        err = packet_push_block(pkt_cur, PACKET_PRESS, buf, sizeof(press_p));
         if (err == ENOMEM) break;
 
         /* Temperature data */
 
-        block_init_temp(block_buf, uorb_data);
-        err = packet_push_block(pkt_cur, PACKET_TEMP, block_buf,
-                                sizeof(temp_p));
+        block_init_temp(buf, data);
+        err = packet_push_block(pkt_cur, PACKET_TEMP, buf, sizeof(temp_p));
         if (err == ENOMEM) break;
 
         /* Altitude data TODO */
@@ -157,27 +155,24 @@ int package_uorb(enum sensor_kind sensor, void *uorb_data, void *block_buf)
       {
         /* Accelerometer data */
 
-        block_init_accel(block_buf, uorb_data);
-        err = packet_push_block(pkt_cur, PACKET_ACCEL, block_buf,
-                                sizeof(accel_p));
+        block_init_accel(buf, data);
+        err = packet_push_block(pkt_cur, PACKET_ACCEL, buf, sizeof(accel_p));
         break;
       }
     case SENSOR_GYRO:
       {
         /* Gyro data */
 
-        block_init_gyro(block_buf, uorb_data);
-        err = packet_push_block(pkt_cur, PACKET_GYRO, block_buf,
-                                sizeof(gyro_p));
+        block_init_gyro(buf, data);
+        err = packet_push_block(pkt_cur, PACKET_GYRO, buf, sizeof(gyro_p));
         break;
       }
     case SENSOR_MAG:
       {
         /* Magnetometer data */
 
-        block_init_mag(block_buf, uorb_data);
-        err =
-            packet_push_block(pkt_cur, PACKET_MAG, block_buf, sizeof(mag_p));
+        block_init_mag(buf, data);
+        err = packet_push_block(pkt_cur, PACKET_MAG, buf, sizeof(mag_p));
         break;
       }
     }
