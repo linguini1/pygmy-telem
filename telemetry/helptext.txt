@@ -6,10 +6,20 @@ before a flight. Make sure that once you've made changes, you save them to the
 Pygmy's on-board memory using the 'save' command. Once saved, you can start the
 flight computer with your new settings by sending the 'reboot' command.
 
-COMMANDS:
+BASIC COMMANDS:
     
     help        Display this help text.
     reboot      Reboot the Pygmy.
     save        Save newly configured settings to the Pygmy's EEPROM (memory).
     current     Print the currently saved settings.
     modified    Print the modified settings.
+
+RADIO CONFIGURATION COMMANDS:
+
+    callsign    Set the user call sign for signing packets.
+    frequency   Set the operating frequency of the radio module in Hz.
+    bandwidth   Set the operating bandwidth of the radio module in kHz.
+    preamble    Set the preamble length for radio packets, in bytes.
+    spread      Set the spread factor of the radio.
+    mod         Set the modulation mode of the radio. Either 'lora' or 'fsk'.
+    txpower     Set the radio transmit power in dBm.

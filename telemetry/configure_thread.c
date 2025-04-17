@@ -69,6 +69,8 @@ static bool starts_with(const char *haystack, const char *needle)
 
 static void trim_trailing(char *str)
 {
+  if (str == NULL) return;
+
   char *end;
   end = str + strlen(str) - 1;
   while (end > str && isspace((unsigned char)*end))
@@ -86,6 +88,31 @@ static void trim_trailing(char *str)
 
 static void print_config(struct configuration_s *config)
 {
+  printf("Radio {\n");
+  printf("\tCallsign: ");
+
+  /* Only print the number of characters permitted to be in the callsign, or
+   * up to the null terminator, whichever comes first. Prevents printing
+   * garbage when EEPROM is uninitialized */
+
+  for (int i = 0; i < CONFIG_PYGMY_CALLSIGN_LEN; i++)
+    {
+      if (config->radio.callsign[i] == '\0')
+        {
+          break;
+        }
+      putchar(config->radio.callsign[i]);
+    }
+  putchar('\n');
+
+  printf("\tFrequency: %lu Hz\n", config->radio.frequency);
+  printf("\tBandwidth: %lu kHz\n", config->radio.bandwidth);
+  printf("\tPreamble length: %u bytes\n", config->radio.prlen);
+  printf("\tSpread factor: %u\n", config->radio.spread);
+  printf("\tModulation type: %s\n", config->radio.mod == 0 ? "lora" : "fsk");
+  printf("\tTransmit power: %f dBm\n", config->radio.txpower);
+  printf("}\n");
+
   printf("IMU {\n");
   printf("\tAccelerometer full scale range: %u g\n", config->imu.xl_fsr);
   printf("\tGyroscope full scale range: %u dps\n", config->imu.gyro_fsr);
@@ -95,30 +122,6 @@ static void print_config(struct configuration_s *config)
   printf("\tGyroscope offsets: (x=%f, y=%f, z=%f) dps\n",
          config->imu.xl_offsets[0], config->imu.xl_offsets[1],
          config->imu.xl_offsets[2]);
-  printf("}\n");
-
-  printf("Radio {\n");
-  printf("\tCallsign: ");
-
-  /* Only print the number of characters permitted to be in the callsign, or
-   * up to the null terminator, whichever comes first. Prevents printing
-   * garbage when EEPROM is uninitialized */
-
-  for (int i = 0; i < sizeof(config->radio.callsign); i++)
-    {
-      if (config->radio.callsign[i] == '\0')
-        {
-          break;
-        }
-      putchar(config->radio.callsign[i]);
-    }
-
-  printf("\tFrequency: %lu Hz\n", config->radio.frequency);
-  printf("\tBandwidth: %lu kHz\n", config->radio.bandwidth);
-  printf("\tPreamble length: %u bytes\n", config->radio.prlen);
-  printf("\tSpread factor: %u\n", config->radio.spread);
-  printf("\tModulation type: %s\n", config->radio.mod == 0 ? "lora" : "fsk");
-  printf("\tTransmit power: %f dBm\n", config->radio.txpower);
   printf("}\n");
 }
 
@@ -169,6 +172,21 @@ static bool set_callsign(char *command, struct configuration_s *config)
 }
 
 /****************************************************************************
+ * Name: get_first_arg
+ *
+ * Description:
+ *   Gets the first argument from the command.
+ *
+ * Returns: A pointer to the first argument
+ ****************************************************************************/
+
+static char *get_first_arg(char *command)
+{
+  strtok(command, " ");
+  return strtok(NULL, " ");
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -206,6 +224,7 @@ void *configure_thread(void *arg)
   int err;
   int configfile;
   ssize_t b_read;
+  char *argument;
   struct configuration_s config;
   struct configuration_s usrconfig;
 
@@ -285,8 +304,53 @@ void *configure_thread(void *arg)
         {
           if (!set_callsign(incoming_command, &usrconfig))
             {
-              fprintf(stderr, "Failed to set callsign.\n");
+              fprintf(stderr,
+                      "Failed to set callsign. Ensure it's less than %d "
+                      "characters\n",
+                      CONFIG_PYGMY_CALLSIGN_LEN);
             }
+        }
+      else if (starts_with(incoming_command, "frequency"))
+        {
+          argument = get_first_arg(incoming_command);
+          usrconfig.radio.frequency = strtoul(argument, NULL, 10);
+        }
+      else if (starts_with(incoming_command, "bandwidth"))
+        {
+          argument = get_first_arg(incoming_command);
+          usrconfig.radio.bandwidth = strtoul(argument, NULL, 10);
+        }
+      else if (starts_with(incoming_command, "preamble"))
+        {
+          argument = get_first_arg(incoming_command);
+          usrconfig.radio.prlen = strtoul(argument, NULL, 10);
+        }
+      else if (starts_with(incoming_command, "spread"))
+        {
+          argument = get_first_arg(incoming_command);
+          usrconfig.radio.spread = strtoul(argument, NULL, 10);
+        }
+      else if (starts_with(incoming_command, "mod"))
+        {
+          argument = get_first_arg(incoming_command);
+          trim_trailing(argument);
+          if (!strcmp(argument, "lora"))
+            {
+              usrconfig.radio.mod = 0;
+            }
+          else if (!strcmp(argument, "fsk"))
+            {
+              usrconfig.radio.mod = 1;
+            }
+          else
+            {
+              fprintf(stderr, "Unrecognized modulation.\n");
+            }
+        }
+      else if (starts_with(incoming_command, "txpower"))
+        {
+          argument = get_first_arg(incoming_command);
+          usrconfig.radio.txpower = strtof(argument, NULL);
         }
 
       /* Unrecognized command */
