@@ -33,6 +33,9 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#include <nuttx/usb/cdcacm.h>
+#include <sys/boardctl.h>
+
 #include "../common/configuration.h"
 #include "arguments.h"
 #include "syncro.h"
@@ -67,6 +70,75 @@ static pthread_t packet_pid;
 static pthread_t configure_pid;
 
 /****************************************************************************
+ * Private Functions
+ ****************************************************************************/
+
+/****************************************************************************
+ * Name: usb_init
+ *
+ * Description:
+ *   Initialize USB device driver for console debug output.
+ ****************************************************************************/
+
+static int usb_init(void)
+{
+  struct boardioc_usbdev_ctrl_s ctrl;
+  FAR void *handle;
+  int ret;
+  int usb_fd;
+
+  /* Initialize architecture */
+
+  ret = boardctl(BOARDIOC_INIT, 0);
+  if (ret != 0)
+    {
+      return ret;
+    }
+
+  /* Initialize the USB serial driver */
+
+  ctrl.usbdev = BOARDIOC_USBDEV_CDCACM;
+  ctrl.action = BOARDIOC_USBDEV_CONNECT;
+  ctrl.instance = 0;
+  ctrl.handle = &handle;
+
+  ret = boardctl(BOARDIOC_USBDEV_CONTROL, (uintptr_t)&ctrl);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  /* Redirect standard streams to USB console */
+
+  do
+    {
+      usb_fd = open("/dev/ttyACM0", O_RDWR);
+
+      /* ENOTCONN means that the USB device is not yet connected, so sleep.
+       * Anything else is bad.
+       */
+
+      DEBUGASSERT(errno == ENOTCONN);
+      usleep(100);
+    }
+  while (usb_fd < 0);
+
+  usb_fd = open("/dev/ttyACM0", O_RDWR);
+
+  dup2(usb_fd, 0); /* stdout */
+  dup2(usb_fd, 1); /* stdin */
+  dup2(usb_fd, 2); /* stderr */
+
+  if (usb_fd > 2)
+    {
+      close(usb_fd);
+    }
+  sleep(1); /* Seems to help ensure first few prints get captured */
+
+  return ret;
+}
+
+/****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
 
@@ -94,6 +166,14 @@ int main(int argc, FAR char *argv[])
       .syncro = &syncro,
       .config = &config,
   };
+
+  /* Enable the USB interface for configuring */
+
+  err = usb_init();
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to initialize USB console: %d\n", errno);
+    }
 
   /* Read configuration data */
 

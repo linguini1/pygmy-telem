@@ -10,7 +10,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <nuttx/usb/cdcacm.h>
 #include <sys/boardctl.h>
 
 #include "../common/configuration.h"
@@ -20,17 +19,19 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#if !defined(CONFIG_CDCACM)
+#define thread_err(err) ((void *)(long)((err)))
+
+#ifndef CONFIG_CDCACM
 #error                                                                       \
     "CONFIG_CDCACM must be enabled, as it is required for USB configuration"
-#endif !defined(CONFIG_CDCACM)
+#endif
 
-#if !defined(CONFIG_CDCACM_CONSOLE)
+#ifndef CONFIG_CDCACM_CONSOLE
 #error                                                                       \
     "CONFIG_CDCACM_CONSOLE must be enabled, as it is required for USB configuration"
 #endif
 
-#if !defined(CONFIG_BOARDCTL_RESET)
+#ifndef CONFIG_BOARDCTL_RESET
 #error "CONFIG_BOARDCTL_RESET must be enabled"
 #endif
 
@@ -39,75 +40,6 @@
  ****************************************************************************/
 
 static char incoming_command[256];
-
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
-
-/****************************************************************************
- * Name: usb_init
- *
- * Description:
- *   Initialize USB device driver for console debug output.
- ****************************************************************************/
-
-static int usb_init(void)
-{
-  struct boardioc_usbdev_ctrl_s ctrl;
-  FAR void *handle;
-  int ret;
-  int usb_fd;
-
-  /* Initialize architecture */
-
-  ret = boardctl(BOARDIOC_INIT, 0);
-  if (ret != 0)
-    {
-      return ret;
-    }
-
-  /* Initialize the USB serial driver */
-
-  ctrl.usbdev = BOARDIOC_USBDEV_CDCACM;
-  ctrl.action = BOARDIOC_USBDEV_CONNECT;
-  ctrl.instance = 0;
-  ctrl.handle = &handle;
-
-  ret = boardctl(BOARDIOC_USBDEV_CONTROL, (uintptr_t)&ctrl);
-  if (ret < 0)
-    {
-      return ret;
-    }
-
-  /* Redirect standard streams to USB console */
-
-  do
-    {
-      usb_fd = open("/dev/ttyACM0", O_RDWR);
-
-      /* ENOTCONN means that the USB device is not yet connected, so sleep.
-       * Anything else is bad.
-       */
-
-      assert(errno == ENOTCONN);
-      usleep(100);
-    }
-  while (usb_fd < 0);
-
-  usb_fd = open("/dev/ttyACM0", O_RDWR);
-
-  dup2(usb_fd, 0); /* stdout */
-  dup2(usb_fd, 1); /* stdin */
-  dup2(usb_fd, 2); /* stderr */
-
-  if (usb_fd > 2)
-    {
-      close(usb_fd);
-    }
-  sleep(1); /* Seems to help ensure first few prints get captured */
-
-  return ret;
-}
 
 /****************************************************************************
  * Name: print_config
@@ -120,8 +52,8 @@ void print_config(struct configuration_s *config)
 {
   printf("Radio {");
   printf("\tCallsign: %s\n", config->radio.callsign);
-  printf("\tFrequency: %u Hz\n", config->radio.frequency);
-  printf("\tBandwidth: %u kHz\n", config->radio.bandwidth);
+  printf("\tFrequency: %lu Hz\n", config->radio.frequency);
+  printf("\tBandwidth: %lu kHz\n", config->radio.bandwidth);
   printf("\tPreamble length: %u bytes\n", config->radio.prlen);
   printf("\tSpread factor: %u\n", config->radio.spread);
   printf("\tModulation type: %s\n", config->radio.mod == 0 ? "lora" : "fsk");
@@ -170,14 +102,6 @@ void *configure_thread(void *arg)
   struct configuration_s config;
   struct configuration_s usrconfig;
 
-  /* Enable the USB interface for configuring */
-
-  err = usb_init();
-  if (err < 0)
-    {
-      fprintf(stderr, "Failed to initialize USB console: %d\n", err);
-    }
-
   /* Read existing configuration data */
 
   configfile = open(CONFIG_PYGMY_TELEM_CONFIGFILE, O_RDONLY);
@@ -185,7 +109,7 @@ void *configure_thread(void *arg)
     {
       err = errno;
       fprintf(stderr, "Couldn't open configuration file: %d\n", err);
-      return EXIT_FAILURE;
+      return thread_err(EXIT_FAILURE);
     }
 
   b_read = read(configfile, &config, sizeof(config));
@@ -194,13 +118,13 @@ void *configure_thread(void *arg)
       err = errno;
       fprintf(stderr, "Couldn't read configuration file: %d\n", err);
       close(configfile);
-      return EXIT_FAILURE;
+      return thread_err(EXIT_FAILURE);
     }
   else if (b_read < sizeof(config))
     {
-      fprintf(stderr, "Couldn't read complete configuration file: %d\n", err);
+      fprintf(stderr, "Couldn't read complete configuration file.\n");
       close(configfile);
-      return EXIT_FAILURE;
+      return thread_err(EXIT_FAILURE);
     }
 
   close(configfile);
@@ -215,7 +139,7 @@ void *configure_thread(void *arg)
     {
       /* Minus one to leave space for null terminator */
 
-      b_read = read(stdin, incoming_command, sizeof(incoming_command) - 1);
+      b_read = read(1, incoming_command, sizeof(incoming_command) - 1);
       if (b_read < 0)
         {
           err = errno;
@@ -225,30 +149,35 @@ void *configure_thread(void *arg)
       /* Guarantee null terminator for safety */
 
       incoming_command[b_read] = '\0';
+      printf("Read: %s\n", incoming_command);
 
       /* Parse commands */
 
-      if (!strcmp(incoming_command, "reboot"))
+      if (strstr(incoming_command, "reboot"))
         {
           /* Reboot the board, causing changes to come into effect */
 
           boardctl(BOARDIOC_RESET, 0);
         }
-      else if (!strcmp(incoming_command, "help"))
+      else if (strstr(incoming_command, "help"))
         {
           printf(HELP_TEXT);
         }
-      else if (!strcmp(incoming_command, "current"))
+      else if (strstr(incoming_command, "current"))
         {
           print_config(&config);
         }
-      else if (!strcmp(incoming_command, "modified"))
+      else if (strstr(incoming_command, "modified"))
         {
           print_config(&usrconfig);
         }
-      else if (!strcmp(incoming_command, "test"))
+      else if (strstr(incoming_command, "test"))
         {
           printf("Test passed.\n");
+        }
+      else
+        {
+          printf("Unknown command: %s\n", incoming_command);
         }
     }
 
