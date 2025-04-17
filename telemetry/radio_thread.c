@@ -107,39 +107,39 @@ void *radio_thread(void *arg)
 
   err = ioctl(radio, WLIOC_SETRADIOFREQ, config.frequency);
   ioctl_err_cancel("Couldn't set radio frequency", err);
-  printf("Radio frequency set to %lu Hz\n", config.frequency);
+  // printf("Radio frequency set to %lu Hz\n", config.frequency);
 
   /* Set operating bandwidth */
 
   err = ioctl(radio, WLIOC_SETBANDWIDTH, config.bandwidth);
   ioctl_err_cancel("Couldn't set radio bandwidth", err);
-  printf("Radio bandwidth set to %lu kHz\n", config.bandwidth);
+  // printf("Radio bandwidth set to %lu kHz\n", config.bandwidth);
 
   /* Set operating preamble length */
 
   err = ioctl(radio, WLIOC_SETPRLEN, config.prlen);
   ioctl_err_cancel("Couldn't set radio preamble length", err);
-  printf("Radio preamble length set to %u\n", config.prlen);
+  // printf("Radio preamble length set to %u\n", config.prlen);
 
   /* Set operating spread factor */
 
   err = ioctl(radio, WLIOC_SETSPREAD, config.spread);
   ioctl_err_cancel("Couldn't set radio spread factor", err);
-  printf("Radio spread factor set to sf%u\n", config.spread);
+  // printf("Radio spread factor set to sf%u\n", config.spread);
 
   /* Set operating modulation */
 
   err = ioctl(radio, WLIOC_SETMOD, config.mod);
   ioctl_err_cancel("Couldn't set radio modulation", err);
-  printf("Radio modulation set to %u\n", config.mod);
+  // printf("Radio modulation set to %u\n", config.mod);
 
   /* Set operating transmission power */
 
   err = ioctl(radio, WLIOC_SETTXPOWERF, &config.txpower);
   ioctl_err_cancel("Couldn't set radio transmit power", err);
-  printf("Radio transmit power set to %.2f\n", config.txpower);
+  // printf("Radio transmit power set to %.2f\n", config.txpower);
 
-  printf("Radio configured.\n");
+  // printf("Radio configured.\n");
 #endif
 
   /* Infinitely read sensors and send packets out */
@@ -178,15 +178,12 @@ void *radio_thread(void *arg)
 
       /* Send packet over radio */
 
-      printf("Transmitting...\n");
       b_sent = write(radio, local_packet.contents, local_packet.len);
       if (b_sent < 0)
         {
           fprintf(stderr, "Packet failed to send: %d\n", errno);
           continue; /* Try a new packet */
         }
-
-      printf("Transmitted\n");
     }
 
   pthread_cleanup_pop(1); /* Close radio */

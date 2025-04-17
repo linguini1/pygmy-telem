@@ -268,7 +268,6 @@ void *packet_thread(void *arg)
 
       /* Construct a packet from sensor data */
 
-      printf("Packet constructing\n");
       for (;;)
         {
           /* Poll forever until some data is available */
@@ -316,7 +315,6 @@ void *packet_thread(void *arg)
 
       /* Share this packet with other threads using syncro monitor */
 
-      printf("Packet publishing\n");
       err = syncro_publish(syncro, pkt_cur);
       if (err)
         {
