@@ -20,6 +20,10 @@
 #define CONFIG_PYGMY_CALLSIGN_LEN 6
 #endif
 
+#ifndef CONFIG_PYGMY_TELEM_CONFIGFILE
+#define CONFIG_PYGMY_TELEM_CONFIGFILE "/eeprom"
+#endif
+
 /****************************************************************************
  * Public Types
  ****************************************************************************/

@@ -33,11 +33,6 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#if defined(CONFIG_CDCACM)
-#include <nuttx/usb/cdcacm.h>
-#include <sys/boardctl.h>
-#endif
-
 #include "../common/configuration.h"
 #include "arguments.h"
 #include "syncro.h"
@@ -45,10 +40,6 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-#ifndef CONFIG_PYGMY_TELEM_CONFIGFILE
-#define CONFIG_PYGMY_TELEM_CONFIGFILE "/eeprom"
-#endif
 
 #ifndef PYGMY_LOG_THREAD_PRIORITY
 #define PYGMY_LOG_THREAD_PRIORITY 130
@@ -62,6 +53,10 @@
 #define PYGMY_PACKET_THREAD_PRIORITY 100
 #endif
 
+#ifndef PYGMY_CONFIGURE_THREAD_PRIORITY
+#define PYGMY_CONFIGURE_THREAD_PRIORITY 200
+#endif
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -69,6 +64,7 @@
 static pthread_t radio_pid;
 static pthread_t log_pid;
 static pthread_t packet_pid;
+static pthread_t configure_pid;
 
 /****************************************************************************
  * Public Function Prototypes
@@ -77,83 +73,11 @@ static pthread_t packet_pid;
 void *log_thread(void *arg);
 void *radio_thread(void *arg);
 void *packet_thread(void *arg);
+void *configure_thread(void *arg);
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
-/****************************************************************************
- * Name: usb_init
- *
- * Description:
- *   Initialize USB device driver for console debug output.
- ****************************************************************************/
-
-#if defined(CONFIG_CDCACM)
-int usb_init(void)
-{
-  struct boardioc_usbdev_ctrl_s ctrl;
-  FAR void *handle;
-  int ret;
-  int usb_fd;
-
-  /* Initialize architecture */
-
-  ret = boardctl(BOARDIOC_INIT, 0);
-  if (ret != 0)
-    {
-      return ret;
-    }
-
-  /* Initialize the USB serial driver */
-
-  ctrl.usbdev = BOARDIOC_USBDEV_CDCACM;
-  ctrl.action = BOARDIOC_USBDEV_CONNECT;
-  ctrl.instance = 0;
-  ctrl.handle = &handle;
-
-  ret = boardctl(BOARDIOC_USBDEV_CONTROL, (uintptr_t)&ctrl);
-  if (ret < 0)
-    {
-      return ret;
-    }
-
-#if defined(CONFIG_CDCACM_CONSOLE)
-
-  /* Redirect standard streams to USB console */
-
-  do
-    {
-      usb_fd = open("/dev/ttyACM0", O_RDWR);
-
-      /* ENOTCONN means that the USB device is not yet connected, so sleep.
-       * Anything else is bad.
-       */
-
-      DEBUGASSERT(errno == ENOTCONN);
-      usleep(100);
-    }
-  while (usb_fd < 0);
-
-  usb_fd = open("/dev/ttyACM0", O_RDWR);
-
-  dup2(usb_fd, 0);
-  dup2(usb_fd, 1);
-  dup2(usb_fd, 2);
-
-  dprintf(usb_fd, "This is a message!\n");
-
-  if (usb_fd > 2)
-    {
-      close(usb_fd);
-    }
-  sleep(1); /* Seems to help ensure first few prints get captured */
-
-#endif /* CONFIG_CDCACM_CONSOLE */
-
-  return ret;
-}
-#endif
 
 /****************************************************************************
  * telemetry_main
@@ -161,7 +85,6 @@ int usb_init(void)
 
 int main(int argc, FAR char *argv[])
 {
-
   int err;
   int configfile;
   ssize_t b_read;
@@ -171,14 +94,6 @@ int main(int argc, FAR char *argv[])
       .syncro = &syncro,
       .config = &config,
   };
-
-#if defined(CONFIG_CDCACM)
-  err = usb_init();
-  if (err < 0)
-    {
-      fprintf(stderr, "Failed to initialize USB console: %d\n", err);
-    }
-#endif
 
   /* Read configuration data */
 
@@ -206,6 +121,21 @@ int main(int argc, FAR char *argv[])
     }
 
   close(configfile);
+
+  /* Start up the configuration thread */
+
+  err = pthread_create(&configure_pid, NULL, configure_thread, NULL);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to start configuration thread %d\n", err);
+    }
+
+  err = pthread_setschedprio(configure_pid, PYGMY_CONFIGURE_THREAD_PRIORITY);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to set priority of configuration thread: %d\n",
+              err);
+    }
 
   /* Configure sensors and perform setup */
 

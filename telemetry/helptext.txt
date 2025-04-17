@@ -1,0 +1,15 @@
+Pygmy REV B
+(c) Matteo Golin, 2025
+
+This shell allows you to configure the Pygmy flight computer with new settings
+before a flight. Make sure that once you've made changes, you save them to the
+Pygmy's on-board memory using the 'save' command. Once saved, you can start the
+flight computer with your new settings by sending the 'reboot' command.
+
+COMMANDS:
+    
+    help        Display this help text.
+    reboot      Reboot the Pygmy.
+    save        Save newly configured settings to the Pygmy's EEPROM (memory).
+    current     Print the currently saved settings.
+    modified    Print the modified settings.
