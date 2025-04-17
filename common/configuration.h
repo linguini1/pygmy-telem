@@ -41,6 +41,16 @@ struct radio_config_s
   float txpower;      /* Transmission power in dBm */
 };
 
+/* IMU configuration parameters */
+
+struct imu_config_s
+{
+  uint8_t xl_fsr;        /* FSR of the accelerometer in g */
+  uint16_t gyro_fsr;     /* FSR of the gyroscope in dps */
+  float xl_offsets[3];   /* Calibration offsets for the accelerometer */
+  float gyro_offsets[3]; /* Calibration offsets for the gyroscope */
+};
+
 /* Telemetry system configuration. Must be kept at a consistent size since
  * configuration is read from external storage at startup.
  */
@@ -48,6 +58,7 @@ struct radio_config_s
 struct configuration_s
 {
   struct radio_config_s radio; /* Radio parameters */
+  struct imu_config_s imu;     /* IMU parameters */
 };
 
 #endif /* _PYGMY_CONFIG_H_ */

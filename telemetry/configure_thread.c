@@ -3,6 +3,7 @@
  ****************************************************************************/
 
 #include <assert.h>
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -42,23 +43,129 @@
 static char incoming_command[256];
 
 /****************************************************************************
+ * Private Functions
+ ****************************************************************************/
+
+/****************************************************************************
+ * Name: starts_with
+ *
+ * Description:
+ *   Detects if a string starts with a sub-string
+ ****************************************************************************/
+
+static bool starts_with(const char *haystack, const char *needle)
+{
+  size_t haylen = strlen(haystack);
+  size_t needlen = strlen(needle);
+  return haylen < needlen ? false : memcmp(needle, haystack, needlen) == 0;
+}
+
+/****************************************************************************
+ * Name: trim_trailing
+ *
+ * Description:
+ *   Trims the trailing white space off of a string.
+ ****************************************************************************/
+
+static void trim_trailing(char *str)
+{
+  char *end;
+  end = str + strlen(str) - 1;
+  while (end > str && isspace((unsigned char)*end))
+    end--;
+  end++;
+  *end = '\0';
+}
+
+/****************************************************************************
  * Name: print_config
  *
  * Description:
  *   Prints the contents of a configuration object to stdout.
  ****************************************************************************/
 
-void print_config(struct configuration_s *config)
+static void print_config(struct configuration_s *config)
 {
-  printf("Radio {");
-  printf("\tCallsign: %s\n", config->radio.callsign);
+  printf("IMU {\n");
+  printf("\tAccelerometer full scale range: %u g\n", config->imu.xl_fsr);
+  printf("\tGyroscope full scale range: %u dps\n", config->imu.gyro_fsr);
+  printf("\tAccelerometer offsets: (x=%f, y=%f, z=%f) m/s^2\n",
+         config->imu.xl_offsets[0], config->imu.xl_offsets[1],
+         config->imu.xl_offsets[2]);
+  printf("\tGyroscope offsets: (x=%f, y=%f, z=%f) dps\n",
+         config->imu.xl_offsets[0], config->imu.xl_offsets[1],
+         config->imu.xl_offsets[2]);
+  printf("}\n");
+
+  printf("Radio {\n");
+  printf("\tCallsign: ");
+
+  /* Only print the number of characters permitted to be in the callsign, or
+   * up to the null terminator, whichever comes first. Prevents printing
+   * garbage when EEPROM is uninitialized */
+
+  for (int i = 0; i < sizeof(config->radio.callsign); i++)
+    {
+      if (config->radio.callsign[i] == '\0')
+        {
+          break;
+        }
+      putchar(config->radio.callsign[i]);
+    }
+
   printf("\tFrequency: %lu Hz\n", config->radio.frequency);
   printf("\tBandwidth: %lu kHz\n", config->radio.bandwidth);
   printf("\tPreamble length: %u bytes\n", config->radio.prlen);
   printf("\tSpread factor: %u\n", config->radio.spread);
   printf("\tModulation type: %s\n", config->radio.mod == 0 ? "lora" : "fsk");
   printf("\tTransmit power: %f dBm\n", config->radio.txpower);
-  printf("}");
+  printf("}\n");
+}
+
+/****************************************************************************
+ * Name: set_callsign
+ *
+ * Description:
+ *   Sets the call sign in the configuration settings from what is provided in
+ *   the command.
+ ****************************************************************************/
+
+static bool set_callsign(char *command, struct configuration_s *config)
+{
+  char *callsign;
+  callsign = strtok(command, " ");
+  callsign = strtok(NULL, " ");
+
+  trim_trailing(callsign);
+
+  if (callsign == NULL) return false;
+
+  size_t len = strlen(callsign);
+
+  /* If user call sign is more than what's allowed, report failure instead of
+   * just truncating */
+
+  if (len > CONFIG_PYGMY_CALLSIGN_LEN)
+    {
+      return false;
+    }
+
+  /* If user call sign is less than maximum, 0 pad the rest */
+  if (len < CONFIG_PYGMY_CALLSIGN_LEN)
+    {
+      memcpy(config->radio.callsign, callsign, len);
+      memset(&config->radio.callsign[len], 0,
+             CONFIG_PYGMY_CALLSIGN_LEN - len);
+    }
+
+  /* Otherwise, truncate the call sign to the maximum */
+
+  else
+    {
+      memcpy(config->radio.callsign, callsign, CONFIG_PYGMY_CALLSIGN_LEN);
+    }
+
+  return true;
 }
 
 /****************************************************************************
@@ -151,30 +258,39 @@ void *configure_thread(void *arg)
       incoming_command[b_read] = '\0';
       printf("Read: %s\n", incoming_command);
 
-      /* Parse commands */
+      /* No-argument commands */
 
-      if (strstr(incoming_command, "reboot"))
+      if (starts_with(incoming_command, "reboot"))
         {
           /* Reboot the board, causing changes to come into effect */
 
           boardctl(BOARDIOC_RESET, 0);
         }
-      else if (strstr(incoming_command, "help"))
+      else if (starts_with(incoming_command, "help"))
         {
           printf(HELP_TEXT);
         }
-      else if (strstr(incoming_command, "current"))
+      else if (starts_with(incoming_command, "current"))
         {
           print_config(&config);
         }
-      else if (strstr(incoming_command, "modified"))
+      else if (starts_with(incoming_command, "modified"))
         {
           print_config(&usrconfig);
         }
-      else if (strstr(incoming_command, "test"))
+
+      /* Configuration setting commands */
+
+      else if (starts_with(incoming_command, "callsign"))
         {
-          printf("Test passed.\n");
+          if (!set_callsign(incoming_command, &usrconfig))
+            {
+              fprintf(stderr, "Failed to set callsign.\n");
+            }
         }
+
+      /* Unrecognized command */
+
       else
         {
           printf("Unknown command: %s\n", incoming_command);
