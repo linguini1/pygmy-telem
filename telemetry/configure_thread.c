@@ -187,6 +187,68 @@ static char *get_first_arg(char *command)
 }
 
 /****************************************************************************
+ * Name: save_settings
+ *
+ * Description:
+ *   Saves the parts of the configuration that have changed.
+ *
+ * Returns: 0 on success, an errno code on failure.
+ ****************************************************************************/
+
+static int save_settings(const struct configuration_s *old,
+                         const struct configuration_s *new)
+{
+  int configfile;
+  int err = 0;
+  ssize_t written;
+
+  /* Open configuration file */
+
+  configfile = open(CONFIG_PYGMY_TELEM_CONFIGFILE, O_RDWR);
+  if (configfile < 0)
+    {
+      err = errno;
+      fprintf(stderr, "Couldn't open configuration file: %d\n", err);
+      return err;
+    }
+
+  /* Detect if there was a difference. TODO: more granularity */
+
+  if (!memcmp(old, new, sizeof(struct configuration_s)))
+    {
+      return 0;
+    }
+
+  /* There was a difference, save the new configuration. */
+
+  written = write(configfile, new, sizeof(struct configuration_s));
+  if (written < 0)
+    {
+      err = errno;
+      fprintf(stderr, "Couldn't save new configuration: %d\n", err);
+      goto cleanup;
+    }
+  else if (written < sizeof(struct configuration_s))
+    {
+      fprintf(stderr,
+              "Could only write %zu/%zu bytes of configuration fully.\n",
+              written, sizeof(struct configuration_s));
+      err = ENOMEM;
+      goto cleanup;
+    }
+
+  /* Everything was written fully */
+  else
+    {
+      return 0;
+    }
+
+cleanup:
+  close(configfile);
+  return err;
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -297,6 +359,14 @@ void *configure_thread(void *arg)
         {
           print_config(&usrconfig);
         }
+      else if (starts_with(incoming_command, "save"))
+        {
+          err = save_settings(&config, &usrconfig);
+          if (err)
+            {
+              fprintf(stderr, "Couldn't save settings: %d\n", err);
+            }
+        }
 
       /* Configuration setting commands */
 
@@ -309,6 +379,7 @@ void *configure_thread(void *arg)
                       "characters\n",
                       CONFIG_PYGMY_CALLSIGN_LEN);
             }
+          printf("Saved successfully! Reboot for changes to take effect.\n");
         }
       else if (starts_with(incoming_command, "frequency"))
         {
