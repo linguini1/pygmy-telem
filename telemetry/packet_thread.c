@@ -10,6 +10,10 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#if defined(CONFIG_RP2040_ADC)
+#include <nuttx/analog/adc.h>
+#endif
+
 #include <uORB/uORB.h>
 
 #include "../common/configuration.h"
@@ -116,7 +120,7 @@ static const uint32_t frequencies[] = {
 };
 
 /****************************************************************************
- * Public Functions
+ * Private Functions
  ****************************************************************************/
 
 /*
@@ -129,7 +133,7 @@ static const uint32_t frequencies[] = {
  * @param buf The buffer to use to put the block in
  * @return 0 on success, ENOMEM on no more packet space
  */
-int package_uorb(enum sensor_kind sensor, void *data, void *buf)
+static int package_uorb(enum sensor_kind sensor, void *data, void *buf)
 {
   int err = 0;
 
@@ -187,6 +191,26 @@ int package_uorb(enum sensor_kind sensor, void *data, void *buf)
 }
 
 /****************************************************************************
+ * Name: to_millivolts
+ *
+ * Description:
+ *   Converts an ADC reading to a millivolts battery reading. Assumes maximum
+ *   battery voltage is 4.2V.
+ *
+ ****************************************************************************/
+
+#if defined(CONFIG_RP2040_ADC)
+uint16_t to_millivolts(struct adc_msg_s *reading)
+{
+  return (4200 * (reading->am_data >> 16)) / (32768);
+}
+#endif
+
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
+
+/****************************************************************************
  * Name: packet_thread
  *
  * Description:
@@ -198,6 +222,10 @@ int package_uorb(enum sensor_kind sensor, void *data, void *buf)
 void *packet_thread(void *arg)
 {
   int err;
+#if defined(CONFIG_RP2040_ADC)
+  int adc;
+  struct adc_msg_s voltage;
+#endif
 
   /* Unpack arguments */
 
@@ -213,7 +241,18 @@ void *packet_thread(void *arg)
   packet_init(&pkt_a, pkt_bufa);
   packet_init(&pkt_b, pkt_bufb);
 
-  /* Get sensor metadata */
+  /* Get file descriptor to ADC for battery measurements */
+
+#if defined(CONFIG_RP2040_ADC)
+  adc = open("/dev/adc0", O_RDONLY);
+  if (adc < 0)
+    {
+      err = errno;
+      fprintf(stderr, "Could not open ADC device: %d\n", err);
+    }
+#endif
+
+    /* Get sensor metadata */
 
 #ifdef CONFIG_SENSORS_MS56XX
   metas[SENSOR_BARO] = orb_get_meta("sensor_baro");
@@ -266,8 +305,33 @@ void *packet_thread(void *arg)
           fprintf(stderr, "Out of packet space!\n");
         }
 
-      /* Construct a packet from sensor data */
+        /* Construct a packet from sensor data */
 
+        /* Add one battery measurement to every packet */
+
+#if defined(CONFIG_RP2040_ADC)
+      ssize_t b_read = read(adc, &voltage, sizeof(voltage));
+      if (b_read < 0)
+        {
+          err = errno;
+          fprintf(stderr, "Couldn't read battery voltage: %d", err);
+          goto uorb_collection;
+        }
+      else if (b_read < sizeof(voltage))
+        {
+          fprintf(stderr, "Couldn't read full battery voltage\n");
+          goto uorb_collection;
+        }
+
+      /* We read some battery voltage, time to make a packet */
+
+      block_init_volt((void *)block_buf, to_millivolts(&voltage));
+      err =
+          packet_push_block(pkt_cur, PACKET_VOLT, block_buf, sizeof(volt_p));
+      if (err == ENOMEM) break;
+#endif
+
+    uorb_collection:
       for (;;)
         {
           /* Poll forever until some data is available */

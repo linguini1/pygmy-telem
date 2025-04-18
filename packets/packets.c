@@ -284,3 +284,21 @@ void block_init_mag(mag_p *blk, struct sensor_mag *data)
   blk->y = (int16_t)(data->y * RADS_TO_DEG * 10.0f);
   blk->z = (int16_t)(data->z * RADS_TO_DEG * 10.0f);
 }
+
+/****************************************************************************
+ * Name: block_init_volt
+ *
+ * Description:
+ *   Initialize a battery voltage block
+ *
+ * Arguments:
+ *  blk - The voltage block to initialize
+ *  voltage - The voltage in millivolts
+ *
+ ****************************************************************************/
+
+void block_init_volt(volt_p *blk, uint16_t voltage)
+{
+  blk->time = 0; /* TODO: implement */
+  blk->voltage = voltage;
+}

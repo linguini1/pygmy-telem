@@ -59,6 +59,7 @@ typedef enum
   PACKET_ACCEL = 0x4, /* Linear acceleration in cm/s^2 */
   PACKET_GYRO = 0x5,  /* Angular velocity in 0.1dps */
   PACKET_MAG = 0x6,   /* Magnetic field in 0.1 uTesla */
+  PACKET_VOLT = 0x7,  /* Battery voltage in millivolts */
 } pkt_kind_e;
 
 /* Coordinate packet */
@@ -124,6 +125,14 @@ typedef struct
   int16_t z;       /* Magnetic field in z in 0.1uT */
 } PACKED mag_p;
 
+/* Battery voltage packet */
+
+typedef struct
+{
+  pkt_time_t time;  /* Mission time */
+  uint16_t voltage; /* Battery voltage in millivolts */
+} PACKED volt_p;
+
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
@@ -142,5 +151,6 @@ void block_init_alt(alt_p *blk, struct sensor_baro *data);
 void block_init_accel(accel_p *blk, struct sensor_accel *data);
 void block_init_gyro(gyro_p *blk, struct sensor_gyro *data);
 void block_init_mag(mag_p *blk, struct sensor_mag *data);
+void block_init_volt(volt_p *blk, uint16_t voltage);
 
 #endif /* _PYGMY_PACKET_H_ */
