@@ -41,15 +41,15 @@ struct packet_s *pkt; /* Shared packet pointer */
 static void close_fd(void *arg) { close(*((int *)(arg))); }
 
 /****************************************************************************
+ * Public Functions
+ ****************************************************************************/
+
+/****************************************************************************
  * Name: log_thread
  *
  * Description:
  *   Performs logging operations to onboard storage.
  *
- ****************************************************************************/
-
-/****************************************************************************
- * Public Functions
  ****************************************************************************/
 
 void *log_thread(void *arg)
@@ -100,7 +100,6 @@ void *log_thread(void *arg)
 
       /* Log packet */
 
-      printf("Logging #%u...\n", count);
       b_written = write(pwrfs, pkt->contents, pkt->len);
       if (b_written <= 0)
         {
@@ -125,7 +124,6 @@ void *log_thread(void *arg)
             }
         }
 
-      printf("Logged #%u.\n", count);
       count++;
     }
 

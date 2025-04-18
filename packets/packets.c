@@ -40,7 +40,13 @@ void packet_header_init(struct packet_hdr_s *hdr, char *callsign, uint8_t num)
   int len;
 
   hdr->num = num;
-  len = strlen(callsign);
+
+  /* Get the length of the call sign. It will be truncated if no null
+   * terminator */
+
+  for (len = 0; len < CONFIG_PYGMY_CALLSIGN_LEN && callsign[len] != '\0';
+       len++)
+    ;
 
   /* If user callsign is less than maximum, 0 pad the rest */
 

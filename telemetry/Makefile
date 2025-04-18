@@ -36,6 +36,7 @@ MAINSRC = telemetry_main.c
 CSRCS += log_thread.c
 CSRCS += radio_thread.c
 CSRCS += packet_thread.c
+CSRCS += configure_thread.c
 CSRCS += syncro.c
 CSRCS += ../packets/packets.c
 

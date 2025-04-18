@@ -33,10 +33,8 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#if defined(CONFIG_CDCACM)
 #include <nuttx/usb/cdcacm.h>
 #include <sys/boardctl.h>
-#endif
 
 #include "../common/configuration.h"
 #include "arguments.h"
@@ -45,10 +43,6 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-#ifndef CONFIG_PYGMY_TELEM_CONFIGFILE
-#define CONFIG_PYGMY_TELEM_CONFIGFILE "/eeprom"
-#endif
 
 #ifndef PYGMY_LOG_THREAD_PRIORITY
 #define PYGMY_LOG_THREAD_PRIORITY 130
@@ -62,6 +56,10 @@
 #define PYGMY_PACKET_THREAD_PRIORITY 100
 #endif
 
+#ifndef PYGMY_CONFIGURE_THREAD_PRIORITY
+#define PYGMY_CONFIGURE_THREAD_PRIORITY 200
+#endif
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -69,17 +67,10 @@
 static pthread_t radio_pid;
 static pthread_t log_pid;
 static pthread_t packet_pid;
+static pthread_t configure_pid;
 
 /****************************************************************************
- * Public Function Prototypes
- ****************************************************************************/
-
-void *log_thread(void *arg);
-void *radio_thread(void *arg);
-void *packet_thread(void *arg);
-
-/****************************************************************************
- * Public Functions
+ * Private Functions
  ****************************************************************************/
 
 /****************************************************************************
@@ -89,8 +80,7 @@ void *packet_thread(void *arg);
  *   Initialize USB device driver for console debug output.
  ****************************************************************************/
 
-#if defined(CONFIG_CDCACM)
-int usb_init(void)
+static int usb_init(void)
 {
   struct boardioc_usbdev_ctrl_s ctrl;
   FAR void *handle;
@@ -118,8 +108,6 @@ int usb_init(void)
       return ret;
     }
 
-#if defined(CONFIG_CDCACM_CONSOLE)
-
   /* Redirect standard streams to USB console */
 
   do
@@ -137,11 +125,9 @@ int usb_init(void)
 
   usb_fd = open("/dev/ttyACM0", O_RDWR);
 
-  dup2(usb_fd, 0);
-  dup2(usb_fd, 1);
-  dup2(usb_fd, 2);
-
-  dprintf(usb_fd, "This is a message!\n");
+  dup2(usb_fd, 0); /* stdout */
+  dup2(usb_fd, 1); /* stdin */
+  dup2(usb_fd, 2); /* stderr */
 
   if (usb_fd > 2)
     {
@@ -149,11 +135,21 @@ int usb_init(void)
     }
   sleep(1); /* Seems to help ensure first few prints get captured */
 
-#endif /* CONFIG_CDCACM_CONSOLE */
-
   return ret;
 }
-#endif
+
+/****************************************************************************
+ * Public Function Prototypes
+ ****************************************************************************/
+
+void *log_thread(void *arg);
+void *radio_thread(void *arg);
+void *packet_thread(void *arg);
+void *configure_thread(void *arg);
+
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
 
 /****************************************************************************
  * telemetry_main
@@ -161,7 +157,6 @@ int usb_init(void)
 
 int main(int argc, FAR char *argv[])
 {
-
   int err;
   int configfile;
   ssize_t b_read;
@@ -172,13 +167,13 @@ int main(int argc, FAR char *argv[])
       .config = &config,
   };
 
-#if defined(CONFIG_CDCACM)
+  /* Enable the USB interface for configuring */
+
   err = usb_init();
   if (err < 0)
     {
-      fprintf(stderr, "Failed to initialize USB console: %d\n", err);
+      fprintf(stderr, "Failed to initialize USB console: %d\n", errno);
     }
-#endif
 
   /* Read configuration data */
 
@@ -207,17 +202,20 @@ int main(int argc, FAR char *argv[])
 
   close(configfile);
 
-  /* Configure sensors and perform setup */
+  /* Start up the configuration thread */
 
-  // TODO: for now, just fill configuration with some valid parameters since
-  // EEPROM is full of junk
-  config.radio.mod = 0;
-  config.radio.prlen = 6;
-  config.radio.frequency = 902000000;
-  config.radio.spread = 7;
-  config.radio.txpower = 18.0f;
-  config.radio.bandwidth = 125;
-  memcpy(config.radio.callsign, "VA3INI", sizeof("VA3INI") - 1);
+  err = pthread_create(&configure_pid, NULL, configure_thread, NULL);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to start configuration thread %d\n", err);
+    }
+
+  err = pthread_setschedprio(configure_pid, PYGMY_CONFIGURE_THREAD_PRIORITY);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to set priority of configuration thread: %d\n",
+              err);
+    }
 
   /* Initialize synchronization object */
 
