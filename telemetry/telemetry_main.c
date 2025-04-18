@@ -217,18 +217,6 @@ int main(int argc, FAR char *argv[])
               err);
     }
 
-  /* Configure sensors and perform setup */
-
-  // TODO: for now, just fill configuration with some valid parameters since
-  // EEPROM is full of junk
-  config.radio.mod = 0;
-  config.radio.prlen = 6;
-  config.radio.frequency = 902000000;
-  config.radio.spread = 7;
-  config.radio.txpower = 18.0f;
-  config.radio.bandwidth = 125;
-  memcpy(config.radio.callsign, "VA3INI", sizeof("VA3INI") - 1);
-
   /* Initialize synchronization object */
 
   err = syncro_init(&syncro);
