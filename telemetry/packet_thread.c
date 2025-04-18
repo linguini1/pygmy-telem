@@ -202,7 +202,13 @@ static int package_uorb(enum sensor_kind sensor, void *data, void *buf)
 #if defined(CONFIG_RP2040_ADC)
 uint16_t to_millivolts(struct adc_msg_s *reading)
 {
-  return (4200 * (reading->am_data >> 16)) / (32768);
+  /* NOTE: the resistor divider on the board will read 3.231V when the battery
+   * voltage is at 4.2. Hence, for a more accurate reading, we use the
+   * constant of 4.3 volts in our calculation. This number would result in a
+   * full 3.308V measurement from the ADC, so our calculated battery voltage
+   * will be closer to the real 4.2.
+   */
+  return (4300 * (reading->am_data >> 16)) / (32768);
 }
 #endif
 
