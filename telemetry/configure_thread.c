@@ -423,6 +423,34 @@ void *configure_thread(void *arg)
           argument = get_first_arg(incoming_command);
           usrconfig.radio.txpower = strtof(argument, NULL);
         }
+      else if (starts_with(incoming_command, "xl_fsr"))
+        {
+          argument = get_first_arg(incoming_command);
+          usrconfig.imu.xl_fsr = strtoul(argument, NULL, 10);
+        }
+      else if (starts_with(incoming_command, "gyro_fsr"))
+        {
+          argument = get_first_arg(incoming_command);
+          usrconfig.imu.gyro_fsr = strtoul(argument, NULL, 10);
+        }
+      else if (starts_with(incoming_command, "xl_off"))
+        {
+          argument = get_first_arg(incoming_command);
+          usrconfig.imu.xl_offsets[0] = strtof(argument, NULL);
+          argument = strtok(NULL, " ");
+          usrconfig.imu.xl_offsets[1] = strtof(argument, NULL);
+          argument = strtok(NULL, " ");
+          usrconfig.imu.xl_offsets[2] = strtof(argument, NULL);
+        }
+      else if (starts_with(incoming_command, "gyro_off"))
+        {
+          argument = get_first_arg(incoming_command);
+          usrconfig.imu.gyro_offsets[0] = strtof(argument, NULL);
+          argument = strtok(NULL, " ");
+          usrconfig.imu.gyro_offsets[1] = strtof(argument, NULL);
+          argument = strtok(NULL, " ");
+          usrconfig.imu.gyro_offsets[2] = strtof(argument, NULL);
+        }
 
       /* Unrecognized command */
 

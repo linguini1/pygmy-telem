@@ -13,4 +13,10 @@
 "andwidth of the radio module in kHz.\n    preamble    Set the preamble lengt" \
 "h for radio packets, in bytes.\n    spread      Set the spread factor of the" \
 " radio.\n    mod         Set the modulation mode of the radio. Either 'lora'" \
-" or 'fsk'.\n    txpower     Set the radio transmit power in dBm.\n"
+" or 'fsk'.\n    txpower     Set the radio transmit power in dBm.\n\nIMU CONF" \
+"IGURATION COMMANDS:\n\n    xl_fsr      Set the full scale range of the accel" \
+"erometer, in Gs.\n    gyro_fsr    Set the full scale range of the gyroscope " \
+"in degrees per second.\n    xl_off      Set the calibration offsets of the a" \
+"ccelerometer in m/s^2.\n                Offsets are subtracted from readings" \
+".\n    gyro_off    Set the calibration offsets of the accelerometer in m/s^2" \
+".\n                Offsets are subtracted from readings.\n"
