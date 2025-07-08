@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -41,6 +42,7 @@
  ****************************************************************************/
 
 static char incoming_command[256];
+static char copy_buf[1024];
 
 /****************************************************************************
  * Private Functions
@@ -249,6 +251,151 @@ cleanup:
 }
 
 /****************************************************************************
+ * Name: copy_file
+ *
+ * Description:
+ *   Copies a file from the power safe log file system to the user file
+ *   system.
+ *
+ * Returns: 0 on success, an errno code on failure.
+ ****************************************************************************/
+
+static int copy_file(const char *fname)
+{
+  int pwrfd;
+  int usrfd;
+  char pwrfname[sizeof(CONFIG_PYGMY_TELEM_PWRFS) + 34];
+  char usrfname[sizeof(CONFIG_PYGMY_TELEM_USRFS) + 34];
+  ssize_t bread;
+  ssize_t bwrote;
+
+  /* Create corresponding user and powerfs file names since `fname` does not
+   * include the path, just the name */
+
+  snprintf(pwrfname, sizeof(pwrfname), CONFIG_PYGMY_TELEM_PWRFS "/%s", fname);
+  snprintf(usrfname, sizeof(usrfname), CONFIG_PYGMY_TELEM_USRFS "/%s", fname);
+
+  /* Open original log */
+
+  pwrfd = open(pwrfname, O_RDONLY);
+  if (pwrfd < 0)
+    {
+      return errno;
+    }
+
+  /* Create new user log file (we can overwrite it because we're taking from
+   * the source) */
+
+  usrfd = open(usrfname, O_WRONLY | O_CREAT);
+  if (usrfd < 0)
+    {
+      fprintf(stderr, "Couldn't create log file in user filesystem: %d\n",
+              errno);
+      close(pwrfd);
+      return errno;
+    }
+
+  /* Copy files over */
+
+  for (;;)
+    {
+      bread = read(pwrfd, copy_buf, sizeof(copy_buf));
+
+      /* End of file, all done */
+
+      if (bread == 0)
+        {
+          break;
+        }
+
+      /* Some error happened */
+
+      if (bread < 0)
+        {
+          fprintf(stderr, "Error reading from log file: %d.\n", errno);
+          close(pwrfd);
+          close(usrfd);
+          return errno;
+        }
+
+      /* Copy all information read to the new file */
+
+      bwrote = write(usrfd, copy_buf, bread);
+
+      /* Some error happened */
+
+      if (bwrote < 0)
+        {
+          fprintf(stderr, "Error writing to user file: %d.\n", errno);
+          close(pwrfd);
+          close(usrfd);
+          return errno;
+        }
+    }
+
+  close(pwrfd);
+  close(usrfd);
+  return 0;
+}
+
+/****************************************************************************
+ * Name: copy_files
+ *
+ * Description:
+ *   Copies all the power safe file system logs to the user file system.
+ *
+ * Returns: 0 on success, an errno code on failure.
+ ****************************************************************************/
+
+static int copy_files(void)
+{
+  int err;
+  DIR *pwrdir;
+  struct dirent *de;
+
+  pwrdir = opendir(CONFIG_PYGMY_TELEM_PWRFS);
+  if (pwrdir == NULL)
+    {
+      return errno;
+    }
+
+  /* Go through all files in the directory and find out their name to parse
+   * out the sequence number.
+   *
+   * NOTE: manpages for `readdir` say to set `errno` to zero prior.
+   */
+
+  errno = 0;
+  while ((de = readdir(pwrdir)) != NULL)
+    {
+      /* Skip non-files just in case */
+
+      if (de->d_type != DT_REG)
+        {
+          continue;
+        }
+
+      printf("Copying '%s'!\n", de->d_name);
+      err = copy_file(de->d_name);
+      if (err)
+        {
+          fprintf(stderr, "Failed to copy %s: %d\n", de->d_name, errno);
+          continue;
+        }
+
+      printf("Copied %s successfully!\n", de->d_name);
+    }
+
+  if (errno != 0)
+    {
+      fprintf(stderr, "Error listing files in log directory: %d\n", errno);
+      return errno;
+    }
+
+  return 0;
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -337,7 +484,6 @@ void *configure_thread(void *arg)
       /* Guarantee null terminator for safety */
 
       incoming_command[b_read] = '\0';
-      printf("Read: %s\n", incoming_command);
 
       /* No-argument commands */
 
@@ -346,6 +492,15 @@ void *configure_thread(void *arg)
           /* Reboot the board, causing changes to come into effect */
 
           boardctl(BOARDIOC_RESET, 0);
+        }
+      else if (starts_with(incoming_command, "copy"))
+        {
+          /* Copy files from log file system to user file system */
+          err = copy_files();
+          if (err)
+            {
+              fprintf(stderr, "Failed to copy all files: %d\n", errno);
+            }
         }
       else if (starts_with(incoming_command, "help"))
         {
