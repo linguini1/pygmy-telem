@@ -47,7 +47,7 @@ config PYGMY_TELEM_PWRFS
 
 config PYGMY_TELEM_USRFS
     string "User file system path"
-    default "/usrfs"
+    default "/ejectfs"
     ---help---
         The path to the user file system (for log extraction on host computer)
 

@@ -13,6 +13,7 @@ BASIC COMMANDS:
     save        Save newly configured settings to the Pygmy's EEPROM (memory).
     current     Print the currently saved settings.
     modified    Print the modified settings.
+    copy        Copy all log files to FAT32 partition for user access.
 
 RADIO CONFIGURATION COMMANDS:
 
