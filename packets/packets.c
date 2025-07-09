@@ -302,3 +302,22 @@ void block_init_volt(volt_p *blk, uint16_t voltage)
   blk->time = 0; /* TODO: implement */
   blk->voltage = voltage;
 }
+
+/****************************************************************************
+ * Name: block_init_coord
+ *
+ * Description:
+ *   Initialize a GPS coordinate block
+ *
+ * Arguments:
+ *  blk - The coordinate block to initialize
+ *  data - The uORB GNSS data block
+ *
+ ****************************************************************************/
+
+void block_init_coord(coord_p *blk, struct sensor_gnss *data)
+{
+  blk->time = us_to_ms(data->timestamp);
+  blk->lat = (int32_t)(data->latitude * 1000000);
+  blk->lon = (int32_t)(data->longitude * 1000000);
+}

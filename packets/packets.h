@@ -152,5 +152,6 @@ void block_init_accel(accel_p *blk, struct sensor_accel *data);
 void block_init_gyro(gyro_p *blk, struct sensor_gyro *data);
 void block_init_mag(mag_p *blk, struct sensor_mag *data);
 void block_init_volt(volt_p *blk, uint16_t voltage);
+void block_init_coord(coord_p *blk, struct sensor_gnss *data);
 
 #endif /* _PYGMY_PACKET_H_ */
