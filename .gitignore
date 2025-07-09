@@ -6,3 +6,7 @@
 
 # Auto-generated Kconfig
 /Kconfig
+
+# Dev tools
+compile_commands.json
+.cache/

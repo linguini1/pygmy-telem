@@ -4,6 +4,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <math.h>
 #include <poll.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -42,6 +43,9 @@ enum sensor_kind
 #endif
 #ifdef CONFIG_SENSORS_LIS2MDL
   SENSOR_MAG,
+#endif
+#ifdef CONFIG_SENSORS_L86_XXX
+  SENSOR_GPS,
 #endif
 };
 
@@ -88,35 +92,69 @@ static struct packet_s *pkt_prev = &pkt_b;
 
 static uint8_t block_buf[32];
 
-/* Buffer to store some sensor data temporarily */
+/* Buffer to store some sensor data temporarily (NOTE: value based on
+ * `sizeof(struct sensor_gnss)`
+ */
 
-static uint8_t uorb_data[32];
+static uint8_t uorb_data[72];
+
+/* Latest GPS coordinate to send out */
+
+#ifdef CONFIG_SENSORS_L86_XXX
+static struct sensor_gnss coordinates;
+#endif
 
 /* uORB sensor polling */
 
 struct pollfd fds[] = {
+#ifdef CONFIG_SENSORS_MS56XX
     [SENSOR_BARO] = {.fd = -1, .events = POLLIN, .revents = 0},
+#endif
+#ifdef CONFIG_SENSORS_LSM6DSO32
     [SENSOR_ACCEL] = {.fd = -1, .events = POLLIN, .revents = 0},
     [SENSOR_GYRO] = {.fd = -1, .events = POLLIN, .revents = 0},
+#endif
+#ifdef CONFIG_SENSORS_LIS2MDL
     [SENSOR_MAG] = {.fd = -1, .events = POLLIN, .revents = 0},
+#endif
+#ifdef CONFIG_SENSORS_L86_XXX
+    [SENSOR_GPS] = {.fd = -1, .events = POLLIN, .revents = 0},
+#endif
 };
 
 /* uORB sensor metadata */
 
 struct orb_metadata const *metas[] = {
+#ifdef CONFIG_SENSORS_MS56XX
     [SENSOR_BARO] = NULL,
-    [SENSOR_ACCEL] = NULL,
-    [SENSOR_GYRO] = NULL,
+#endif
+#ifdef CONFIG_SENSORS_LSM6DSO32
+    [SENSOR_ACCEL] = NULL, [SENSOR_GYRO] = NULL,
+#endif
+#ifdef CONFIG_SENSORS_LIS2MDL
     [SENSOR_MAG] = NULL,
+#endif
+#ifdef CONFIG_SENSORS_L86_XXX
+    [SENSOR_GPS] = NULL,
+#endif
 };
 
 /* uORB sensor frequencies */
 
 static const uint32_t frequencies[] = {
+#ifdef CONFIG_SENSORS_MS56XX
     [SENSOR_BARO] = CONFIG_PYGMY_BARO_FREQ,
+#endif
+#ifdef CONFIG_SENSORS_LSM6DSO32
     [SENSOR_ACCEL] = CONFIG_PYGMY_ACCEL_FREQ,
     [SENSOR_GYRO] = CONFIG_PYGMY_GYRO_FREQ,
+#endif
+#ifdef CONFIG_SENSORS_LIS2MDL
     [SENSOR_MAG] = CONFIG_PYGMY_MAG_FREQ,
+#endif
+#ifdef CONFIG_SENSORS_L86_XXX
+    [SENSOR_GPS] = 1, /* 1Hz for now */
+#endif
 };
 
 /****************************************************************************
@@ -139,6 +177,7 @@ static int package_uorb(enum sensor_kind sensor, void *data, void *buf)
 
   switch (sensor)
     {
+#ifdef CONFIG_SENSORS_MS56XX
     case SENSOR_BARO:
       {
         /* Pressure data */
@@ -159,6 +198,8 @@ static int package_uorb(enum sensor_kind sensor, void *data, void *buf)
         err = packet_push_block(pkt_cur, PACKET_ALT, buf, sizeof(alt_p));
         if (err == ENOMEM) break;
       }
+#endif
+#ifdef CONFIG_SENSORS_LSM6DSO32
     case SENSOR_ACCEL:
       {
         /* Accelerometer data */
@@ -175,6 +216,8 @@ static int package_uorb(enum sensor_kind sensor, void *data, void *buf)
         err = packet_push_block(pkt_cur, PACKET_GYRO, buf, sizeof(gyro_p));
         break;
       }
+#endif
+#ifdef CONFIG_SENSORS_LIS2MDL
     case SENSOR_MAG:
       {
         /* Magnetometer data */
@@ -183,9 +226,17 @@ static int package_uorb(enum sensor_kind sensor, void *data, void *buf)
         err = packet_push_block(pkt_cur, PACKET_MAG, buf, sizeof(mag_p));
         break;
       }
-    }
+#endif
+#ifdef CONFIG_SENSORS_L86_XXX
+    case SENSOR_GPS:
+      {
+        /* Store the latest GPS coordinates */
 
-  /* GPS data TODO */
+        memcpy(&coordinates, data, sizeof(coordinates));
+        break;
+      }
+#endif
+    }
 
   return err;
 }
@@ -258,7 +309,14 @@ void *packet_thread(void *arg)
     }
 #endif
 
-    /* Get sensor metadata */
+    /* Mark coordinates as initially invalid */
+
+#ifdef CONFIG_SENSORS_L86_XXX
+  coordinates.latitude = NAN;
+  coordinates.longitude = NAN;
+#endif
+
+  /* Get sensor metadata */
 
 #ifdef CONFIG_SENSORS_MS56XX
   metas[SENSOR_BARO] = orb_get_meta("sensor_baro");
@@ -269,6 +327,9 @@ void *packet_thread(void *arg)
 #endif
 #ifdef CONFIG_SENSORS_LIS2MDL
   metas[SENSOR_MAG] = orb_get_meta("sensor_mag");
+#endif
+#ifdef CONFIG_SENSORS_L86_XXX
+  metas[SENSOR_GPS] = orb_get_meta("sensor_gnss");
 #endif
 
   /* Subscribe to all sensors */
@@ -337,6 +398,18 @@ void *packet_thread(void *arg)
       if (err == ENOMEM) break;
 #endif
 
+      /* Add the latest GPS coordinates to every packet if they're valid */
+
+#ifdef CONFIG_SENSORS_L86_XXX
+      if (!isnan(coordinates.latitude) && !isnan(coordinates.longitude))
+        {
+          block_init_coord((void *)block_buf, &coordinates);
+          err = packet_push_block(pkt_cur, PACKET_COORD, block_buf,
+                                  sizeof(coord_p));
+        }
+      if (err == ENOMEM) break;
+#endif
+
     uorb_collection:
       for (;;)
         {
@@ -363,7 +436,7 @@ void *packet_thread(void *arg)
                   err = orb_copy(metas[i], fds[i].fd, uorb_data);
                   if (err < 0)
                     {
-                      fprintf(stderr, "Error copying uORB data: %d\n", err);
+                      fprintf(stderr, "Error copying uORB data: %d\n", errno);
                       continue;
                     }
 
