@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
+#include <nuttx/sensors/ioctl.h>
 #include <poll.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -48,24 +49,6 @@ enum sensor_kind
   SENSOR_GPS,
 #endif
 };
-
-/* Sensor sampling frequencies (Hz) */
-
-#ifndef CONFIG_PYGMY_BARO_FREQ
-#define CONFIG_PYGMY_BARO_FREQ 25
-#endif
-
-#ifndef CONFIG_PYGMY_ACCEL_FREQ
-#define CONFIG_PYGMY_ACCEL_FREQ 50
-#endif
-
-#ifndef CONFIG_PYGMY_GYRO_FREQ
-#define CONFIG_PYGMY_GYRO_FREQ 50
-#endif
-
-#ifndef CONFIG_PYGMY_MAG_FREQ
-#define CONFIG_PYGMY_MAG_FREQ 50
-#endif
 
 /****************************************************************************
  * Private Data
@@ -153,7 +136,7 @@ static const uint32_t frequencies[] = {
     [SENSOR_MAG] = CONFIG_PYGMY_MAG_FREQ,
 #endif
 #ifdef CONFIG_SENSORS_L86_XXX
-    [SENSOR_GPS] = 1, /* 1Hz for now */
+    [SENSOR_GPS] = CONFIG_PYGMY_GPS_FREQ,
 #endif
 };
 
@@ -344,6 +327,38 @@ void *packet_thread(void *arg)
         }
     }
 
+    /* Set sensor specific settings */
+
+#ifdef CONFIG_SENSORS_LSM6DSO32
+  err =
+      orb_ioctl(fds[SENSOR_ACCEL].fd, SNIOC_SETFULLSCALE, config->imu.xl_fsr);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to set accelerometer FSR: %d\n", errno);
+    }
+
+  err = orb_ioctl(fds[SENSOR_ACCEL].fd, SNIOC_SET_CALIBVALUE,
+                  (unsigned long)config->imu.xl_offsets);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to set accelerometer offsets: %d\n", errno);
+    }
+
+  err = orb_ioctl(fds[SENSOR_GYRO].fd, SNIOC_SETFULLSCALE,
+                  config->imu.gyro_fsr);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to set gyroscope FSR: %d\n", errno);
+    }
+
+  err = orb_ioctl(fds[SENSOR_GYRO].fd, SNIOC_SET_CALIBVALUE,
+                  (unsigned long)config->imu.gyro_offsets);
+  if (err < 0)
+    {
+      fprintf(stderr, "Failed to set gyroscope offsets: %d\n", errno);
+    }
+#endif
+
   /* Set sensor frequencies */
 
   for (int i = 0; i < array_len(frequencies); i++)
@@ -351,8 +366,8 @@ void *packet_thread(void *arg)
       err = orb_set_frequency(fds[i].fd, frequencies[i]);
       if (err < 0)
         {
-          fprintf(stderr, "Couldn't set frequency of '%s'\n",
-                  metas[i]->o_name);
+          fprintf(stderr, "Couldn't set frequency of '%s': %d\n",
+                  metas[i]->o_name, errno);
         }
     }
 

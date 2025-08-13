@@ -206,7 +206,7 @@ static int save_settings(const struct configuration_s *old,
 
   /* Open configuration file */
 
-  configfile = open(CONFIG_PYGMY_TELEM_CONFIGFILE, O_RDWR);
+  configfile = open(CONFIG_PYGMY_TELEM_CONFIGFILE, O_WRONLY | O_CREAT);
   if (configfile < 0)
     {
       err = errno;
@@ -240,10 +240,8 @@ static int save_settings(const struct configuration_s *old,
     }
 
   /* Everything was written fully */
-  else
-    {
-      return 0;
-    }
+
+  err = 0;
 
 cleanup:
   close(configfile);
@@ -464,8 +462,9 @@ void *configure_thread(void *arg)
 
   close(configfile);
 
-  memcpy(&usrconfig, &config,
-         sizeof(config)); /* Files are the same before modifications start */
+  /* Files are the same before modifications start */
+
+  memcpy(&usrconfig, &config, sizeof(config));
 
   /* Infinitely perform blocking reads on the USB. As commands come in,
    * process them. */
