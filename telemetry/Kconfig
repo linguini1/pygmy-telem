@@ -12,78 +12,98 @@ config PYGMY_TELEM_TELEMETRY
 if PYGMY_TELEM_TELEMETRY
 
 config PYGMY_TELEM_PRIORITY
-    int "Application priority"
-    default 100
+	int "Application priority"
+	default 100
 
 config PYGMY_TELEM_STACKSIZE
-    int "Application stack size"
-    default 2048
+	int "Application stack size"
+	default 2048
 
 config PYGMY_TELEM_RADIOPATH
-    string "Radio path"
-    default "/dev/rn2903"
-    ---help---
-        The path to the character device to use as the transmitter.
+	string "Radio path"
+	default "/dev/rn2903"
+	---help---
+		The path to the character device to use as the transmitter.
 
 config PYGMY_CALLSIGN_LEN
-    int "Length of call sign"
-    default 6
-    ---help---
-        The length of the user callsign prepended to each transmitted packet.
-        Default of 6 allows standard Canadian HAM call sign.
+	int "Length of call sign"
+	default 6
+	---help---
+		The length of the user callsign prepended to each transmitted packet.
+		Default of 6 allows standard Canadian HAM call sign.
 
 config PYGMY_PACKET_MAXLEN
-    int "Maximum packet length"
-    default 255
-    ---help---
-        Maximum allowed packet length in bytes. Packet length in transmission 
-        is still limited by the radio setting, this only affects construction.
+	int "Maximum packet length"
+	default 255
+	---help---
+		Maximum allowed packet length in bytes. Packet length in transmission 
+		is still limited by the radio setting, this only affects construction.
 
 config PYGMY_TELEM_PWRFS
-    string "Power fail-safe file system path"
-    default "/pwrfs"
-    ---help---
-        The path to the power fail safe file system
+	string "Power fail-safe file system path"
+	default "/pwrfs"
+	---help---
+		The path to the power fail safe file system
 
 config PYGMY_TELEM_USRFS
-    string "User file system path"
-    default "/ejectfs"
-    ---help---
-        The path to the user file system (for log extraction on host computer)
+	string "User file system path"
+	default "/ejectfs"
+	---help---
+		The path to the user file system (for log extraction on host computer)
 
 config PYGMY_TELEM_CONFIGFILE
-    string "Configuration file path"
-    default "/eeprom"
-    ---help---
-        The path to the user configuration file.
+	string "Configuration file path"
+	default "/eeprom"
+	---help---
+		The path to the user configuration file.
 
 config PYGMY_BARO_FREQ
-    int "Barometer sample frequency (Hz)"
-    depends on CONFIG_SENSORS_MS56XX
-    default 25
+	int "Barometer sample frequency (Hz)"
+	depends on SENSORS_MS56XX
+	range 0 100
+	default 25
+	---help---
+		The sampling frequency of the barometer in Hz.
 
 config PYGMY_ACCEL_FREQ
-    int "Accelerometer sample frequency (Hz)"
-    depends on CONFIG_SENSORS_LSM6DSO32
-    default 50
+	int "Accelerometer sample frequency (Hz)"
+	depends on SENSORS_LSM6DSO32
+	default 50
+	range 0 6666
+	---help---
+		The sampling frequency of the accelerometer in Hz.
 
 config PYGMY_GYRO_FREQ
-    int "Gyroscope sample frequency (Hz)"
-    depends on CONFIG_SENSORS_LSM6DSO32
-    default 50
+	int "Gyroscope sample frequency (Hz)"
+	depends on SENSORS_LSM6DSO32
+	default 50
+	range 0 6666
+	---help---
+		The sampling frequency of the gyroscope in Hz.
 
 config PYGMY_MAG_FREQ
-    int "Magnetometer sample frequency (Hz)"
-    depends on CONFIG_SENSORS_LIS2MDL
-    default 50
+	int "Magnetometer sample frequency (Hz)"
+	depends on SENSORS_LIS2MDL
+	default 50
+	range 0 100
+	---help---
+		The sampling frequency of the magnetometer in Hz.
+
+config PYGMY_GPS_FREQ
+	int "GPS sample frequency (Hz)"
+	depends on SENSORS_L86_XXX
+	default 10
+	range 0 10
+	---help---
+		The sampling frequency of the GPS device in Hz.
 
 config PYGMY_NLOGSAVE
-    int "Log save interval"
-    default 20
-    ---help---
-        It takes some time to save the logs to littlefs when flushed, so flush
-        calls should be limited. However, if power is lost between flushes, all
-        unflushed logs are lost. The user can decide after how many logs to
-        flush.
+	int "Log save interval"
+	default 20
+	---help---
+		It takes some time to save the logs to littlefs when flushed, so flush
+		calls should be limited. However, if power is lost between flushes, all
+		unflushed logs are lost. The user can decide after how many logs to
+		flush.
 
 endif
