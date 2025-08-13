@@ -27,9 +27,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -39,6 +37,7 @@
 #include "../common/configuration.h"
 #include "arguments.h"
 #include "syncro.h"
+#include "syslogging.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -73,6 +72,7 @@ static pthread_t configure_pid;
  * Private Functions
  ****************************************************************************/
 
+#ifndef CONFIG_NSH_ARCHINIT
 /****************************************************************************
  * Name: usb_init
  *
@@ -112,7 +112,7 @@ static int usb_init(void)
 
   do
     {
-      usb_fd = open("/dev/ttyACM0", O_RDWR);
+      usb_fd = open(CONFIG_PYGMY_TELEM_USB, O_RDWR);
 
       /* ENOTCONN means that the USB device is not yet connected, so sleep.
        * Anything else is bad.
@@ -123,7 +123,7 @@ static int usb_init(void)
     }
   while (usb_fd < 0);
 
-  usb_fd = open("/dev/ttyACM0", O_RDWR);
+  usb_fd = open(CONFIG_PYGMY_TELEM_USB, O_RDWR);
 
   dup2(usb_fd, 0); /* stdout */
   dup2(usb_fd, 1); /* stdin */
@@ -137,6 +137,7 @@ static int usb_init(void)
 
   return ret;
 }
+#endif
 
 /****************************************************************************
  * Public Function Prototypes
@@ -167,13 +168,15 @@ int main(int argc, FAR char *argv[])
       .config = &config,
   };
 
+#ifndef CONFIG_NSH_ARCHINIT
   /* Enable the USB interface for configuring */
 
   err = usb_init();
   if (err < 0)
     {
-      fprintf(stderr, "Failed to initialize USB console: %d\n", errno);
+      pyerr("Failed to initialize USB console: %d\n", errno);
     }
+#endif
 
   /* Read configuration data */
 
@@ -181,7 +184,7 @@ int main(int argc, FAR char *argv[])
   if (configfile < 0)
     {
       err = errno;
-      fprintf(stderr, "Couldn't open configuration file: %d\n", err);
+      pyerr("Couldn't open configuration file: %d\n", err);
       return EXIT_FAILURE;
     }
 
@@ -189,13 +192,13 @@ int main(int argc, FAR char *argv[])
   if (b_read < 0)
     {
       err = errno;
-      fprintf(stderr, "Couldn't read configuration file: %d\n", err);
+      pyerr("Couldn't read configuration file: %d\n", err);
       close(configfile);
       return EXIT_FAILURE;
     }
   else if (b_read < sizeof(config))
     {
-      fprintf(stderr, "Couldn't read complete configuration file: %d\n", err);
+      pyerr("Couldn't read complete configuration file.\n");
       close(configfile);
       return EXIT_FAILURE;
     }
@@ -207,14 +210,13 @@ int main(int argc, FAR char *argv[])
   err = pthread_create(&configure_pid, NULL, configure_thread, NULL);
   if (err < 0)
     {
-      fprintf(stderr, "Failed to start configuration thread %d\n", err);
+      pyerr("Failed to start configuration thread %d\n", err);
     }
 
   err = pthread_setschedprio(configure_pid, PYGMY_CONFIGURE_THREAD_PRIORITY);
   if (err < 0)
     {
-      fprintf(stderr, "Failed to set priority of configuration thread: %d\n",
-              err);
+      pyerr("Failed to set priority of configuration thread: %d\n", err);
     }
 
   /* Initialize synchronization object */
@@ -222,8 +224,7 @@ int main(int argc, FAR char *argv[])
   err = syncro_init(&syncro);
   if (err)
     {
-      fprintf(stderr, "Could not initialize synchronization object: %d\n",
-              err);
+      pyerr("Could not initialize synchronization object: %d\n", err);
       return EXIT_FAILURE;
     }
 
@@ -232,13 +233,13 @@ int main(int argc, FAR char *argv[])
   err = pthread_create(&packet_pid, NULL, packet_thread, (void *)&args);
   if (err < 0)
     {
-      fprintf(stderr, "Failed to start radio thread: %d\n", err);
+      pyerr("Failed to start radio thread: %d\n", err);
     }
 
   err = pthread_setschedprio(packet_pid, PYGMY_PACKET_THREAD_PRIORITY);
   if (err < 0)
     {
-      fprintf(stderr, "Failed to set priority of packet thread: %d\n", err);
+      pyerr("Failed to set priority of packet thread: %d\n", err);
     }
 
   /* Start logging thread. */
@@ -246,13 +247,13 @@ int main(int argc, FAR char *argv[])
   err = pthread_create(&log_pid, NULL, log_thread, (void *)&args);
   if (err < 0)
     {
-      fprintf(stderr, "Failed to start logging thread %d\n", err);
+      pyerr("Failed to start logging thread %d\n", err);
     }
 
   err = pthread_setschedprio(log_pid, PYGMY_LOG_THREAD_PRIORITY);
   if (err < 0)
     {
-      fprintf(stderr, "Failed to set priority of logging thread: %d\n", err);
+      pyerr("Failed to set priority of logging thread: %d\n", err);
     }
 
   /* Start radio broadcast thread */
@@ -260,31 +261,31 @@ int main(int argc, FAR char *argv[])
   err = pthread_create(&radio_pid, NULL, radio_thread, (void *)&args);
   if (err < 0)
     {
-      fprintf(stderr, "Failed to start radio thread: %d\n", err);
+      pyerr("Failed to start radio thread: %d\n", err);
     }
 
   err = pthread_setschedprio(radio_pid, PYGMY_RADIO_THREAD_PRIORITY);
   if (err < 0)
     {
-      fprintf(stderr, "Failed to set priority of radio thread: %d\n", err);
+      pyerr("Failed to set priority of radio thread: %d\n", err);
     }
 
   pthread_join(log_pid, (void *)&err);
   if (err)
     {
-      fprintf(stderr, "Logging thread exited with error: %d\n", err);
+      pyerr("Logging thread exited with error: %d\n", err);
     }
 
   pthread_join(radio_pid, (void *)&err);
   if (err)
     {
-      fprintf(stderr, "Radio thread exited with error: %d\n", err);
+      pyerr("Radio thread exited with error: %d\n", err);
     }
 
   pthread_join(packet_pid, (void *)&err);
   if (err)
     {
-      fprintf(stderr, "Packet thread exited with error: %d\n", err);
+      pyerr("Packet thread exited with error: %d\n", err);
     }
 
   return EXIT_SUCCESS;

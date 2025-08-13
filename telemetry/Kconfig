@@ -11,6 +11,8 @@ config PYGMY_TELEM_TELEMETRY
 
 if PYGMY_TELEM_TELEMETRY
 
+comment "Program options"
+
 config PYGMY_TELEM_PRIORITY
 	int "Application priority"
 	default 100
@@ -19,25 +21,13 @@ config PYGMY_TELEM_STACKSIZE
 	int "Application stack size"
 	default 2048
 
+comment "Device path options"
+
 config PYGMY_TELEM_RADIOPATH
 	string "Radio path"
 	default "/dev/rn2903"
 	---help---
 		The path to the character device to use as the transmitter.
-
-config PYGMY_CALLSIGN_LEN
-	int "Length of call sign"
-	default 6
-	---help---
-		The length of the user callsign prepended to each transmitted packet.
-		Default of 6 allows standard Canadian HAM call sign.
-
-config PYGMY_PACKET_MAXLEN
-	int "Maximum packet length"
-	default 255
-	---help---
-		Maximum allowed packet length in bytes. Packet length in transmission 
-		is still limited by the radio setting, this only affects construction.
 
 config PYGMY_TELEM_PWRFS
 	string "Power fail-safe file system path"
@@ -56,6 +46,47 @@ config PYGMY_TELEM_CONFIGFILE
 	default "/eeprom"
 	---help---
 		The path to the user configuration file.
+
+config PYGMY_TELEM_USB
+	string "USB device file path"
+	depends on USBDEV
+	default "/dev/ttyACM0"
+	---help---
+		The path to the USB output device.
+
+config PYGMY_TELEM_BAT_ADC
+	string "Battery ADC file path"
+	depends on ADC
+	default "/dev/adc0"
+	---help---
+		The path to the ADC device that reads battery voltage.
+
+comment "Packet options"
+
+config PYGMY_CALLSIGN_LEN
+	int "Length of call sign"
+	default 6
+	---help---
+		The length of the user callsign prepended to each transmitted packet.
+		Default of 6 allows standard Canadian HAM call sign.
+
+config PYGMY_PACKET_MAXLEN
+	int "Maximum packet length"
+	default 255
+	---help---
+		Maximum allowed packet length in bytes. Packet length in transmission 
+		is still limited by the radio setting, this only affects construction.
+
+config PYGMY_NLOGSAVE
+	int "Log save interval"
+	default 20
+	---help---
+		It takes some time to save the logs to littlefs when flushed, so flush
+		calls should be limited. However, if power is lost between flushes, all
+		unflushed logs are lost. The user can decide after how many logs to
+		flush.
+
+comment "Sampling options"
 
 config PYGMY_BARO_FREQ
 	int "Barometer sample frequency (Hz)"
@@ -97,13 +128,34 @@ config PYGMY_GPS_FREQ
 	---help---
 		The sampling frequency of the GPS device in Hz.
 
-config PYGMY_NLOGSAVE
-	int "Log save interval"
-	default 20
+comment "Syslog options"
+
+config PYGMY_SYSLOG_ERR
+	bool "Error logs enabled"
+	depends on SYSLOG
+	default n
 	---help---
-		It takes some time to save the logs to littlefs when flushed, so flush
-		calls should be limited. However, if power is lost between flushes, all
-		unflushed logs are lost. The user can decide after how many logs to
-		flush.
+		Enables error syslog outputs on Pygmy.
+
+config PYGMY_SYSLOG_WARN
+	bool "Warning logs enabled"
+	depends on SYSLOG
+	default n
+	---help---
+		Enables warning syslog outputs on Pygmy.
+
+config PYGMY_SYSLOG_INFO
+	bool "Info logs enabled"
+	depends on SYSLOG
+	default n
+	---help---
+		Enables info syslog outputs on Pygmy.
+
+config PYGMY_SYSLOG_DEBUG
+	bool "Debug logs enabled"
+	depends on SYSLOG
+	default n
+	---help---
+		Enables debug syslog outputs on Pygmy.
 
 endif

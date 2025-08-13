@@ -13,6 +13,7 @@
 #include "../packets/packets.h"
 #include "arguments.h"
 #include "syncro.h"
+#include "syslogging.h"
 
 /****************************************************************************
  * Private Data
@@ -71,6 +72,7 @@ static int logfile_next(int *fd, unsigned *seqnum)
   err = open(filename, O_WRONLY | O_CREAT);
   if (err < 0)
     {
+      pyerr("Couldn't open log file '%s': %d\n", filename, errno);
       return errno;
     }
 
@@ -176,19 +178,22 @@ static int logfile_cur_seqnum(unsigned *seqnum)
 void *log_thread(void *arg)
 {
   syncro_t *syncro = args_syncro(arg);
-
   int err;
   int pwrfs = -1;
   unsigned seqnum = 0;
   ssize_t b_written;
   pkt = NULL;
 
+  pyinfo("Log thread started.\n");
+
   /* Get the next available sequence number */
+
   err = logfile_cur_seqnum(&seqnum);
   if (err)
     {
-      fprintf(stderr, "Couldn't get the next available sequence number.\n");
-      pthread_exit((void *)(long)err);
+      /* Should use `seqnum` of 0 from above var init in this case */
+
+      pywarn("Couldn't get the next available sequence number.\n");
     }
 
   /* Open power safe file system */
@@ -197,7 +202,7 @@ void *log_thread(void *arg)
   if (err)
     {
       err = errno;
-      fprintf(stderr, "Couldn't open power safe log file: %d\n", err);
+      pyerr("Couldn't open power safe log file: %d\n", err);
       pthread_exit((void *)(long)err);
     }
 
@@ -214,7 +219,7 @@ void *log_thread(void *arg)
 
       if (err)
         {
-          fprintf(stderr, "Error getting shared packet: %d\n", err);
+          pyerr("Error getting shared packet: %d\n", err);
           continue; /* Try again */
         }
 
@@ -222,7 +227,7 @@ void *log_thread(void *arg)
 
       if (pkt == NULL)
         {
-          fprintf(stderr, "Shared packet was NULL.\n");
+          pywarn("Shared packet was NULL.\n");
           syncro_mark_logged(syncro);
           continue;
         }
@@ -238,7 +243,7 @@ void *log_thread(void *arg)
 
           if (err != EFBIG)
             {
-              fprintf(stderr, "Couldn't write data to logfile: %d\n", err);
+              pyerr("Couldn't write data to logfile: %d\n", err);
               continue;
             }
 
@@ -248,11 +253,11 @@ void *log_thread(void *arg)
           err = logfile_next(&pwrfs, &seqnum);
           if (err)
             {
-              fprintf(stderr, "Couldn't create logfile %d: %d\n", seqnum,
-                      err);
+              pyerr("Couldn't create logfile %d: %d\n", seqnum, err);
               continue;
             }
         }
+      pydebug("Logged %d!\n", ((struct packet_hdr_s *)(pkt->contents))->num);
 
       /* Mark packet as logged */
 
@@ -262,11 +267,16 @@ void *log_thread(void *arg)
 
       if (count % CONFIG_PYGMY_NLOGSAVE == 0)
         {
+          pydebug("Syncing log file...\n");
           err = fsync(pwrfs);
           if (err < 0)
             {
               err = errno;
-              fprintf(stderr, "Couldn't sync logfile: %d\n", err);
+              pyerr("Couldn't sync logfile: %d\n", err);
+            }
+          else
+            {
+              pydebug("Log file synced!\n");
             }
         }
 
