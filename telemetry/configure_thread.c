@@ -16,6 +16,7 @@
 
 #include "../common/configuration.h"
 #include "helptext.h"
+#include "syslogging.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -441,7 +442,7 @@ void *configure_thread(void *arg)
   if (configfile < 0)
     {
       err = errno;
-      fprintf(stderr, "Couldn't open configuration file: %d\n", err);
+      pyerr("Couldn't open configuration file: %d\n", err);
       return thread_err(EXIT_FAILURE);
     }
 
@@ -449,13 +450,13 @@ void *configure_thread(void *arg)
   if (b_read < 0)
     {
       err = errno;
-      fprintf(stderr, "Couldn't read configuration file: %d\n", err);
+      pyerr("Couldn't read configuration file: %d\n", err);
       close(configfile);
       return thread_err(EXIT_FAILURE);
     }
   else if (b_read < sizeof(config))
     {
-      fprintf(stderr, "Couldn't read complete configuration file.\n");
+      pyerr("Couldn't read complete configuration file.\n");
       close(configfile);
       return thread_err(EXIT_FAILURE);
     }
@@ -477,8 +478,10 @@ void *configure_thread(void *arg)
       if (b_read < 0)
         {
           err = errno;
-          // TODO syslog error
+          pyerr("Couldn't read incoming command: %d\n", err);
         }
+
+      pyinfo("Read command.\n");
 
       /* Guarantee null terminator for safety */
 

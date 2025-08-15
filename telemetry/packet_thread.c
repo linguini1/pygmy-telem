@@ -22,6 +22,7 @@
 #include "../packets/packets.h"
 #include "arguments.h"
 #include "syncro.h"
+#include "syslogging.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -107,18 +108,33 @@ struct pollfd fds[] = {
 
 /* uORB sensor metadata */
 
-struct orb_metadata const *metas[] = {
 #ifdef CONFIG_SENSORS_MS56XX
-    [SENSOR_BARO] = NULL,
+ORB_DECLARE(sensor_baro);
 #endif
 #ifdef CONFIG_SENSORS_LSM6DSO32
-    [SENSOR_ACCEL] = NULL, [SENSOR_GYRO] = NULL,
+ORB_DECLARE(sensor_accel);
+ORB_DECLARE(sensor_gyro);
 #endif
 #ifdef CONFIG_SENSORS_LIS2MDL
-    [SENSOR_MAG] = NULL,
+ORB_DECLARE(sensor_mag);
 #endif
 #ifdef CONFIG_SENSORS_L86_XXX
-    [SENSOR_GPS] = NULL,
+ORB_DECLARE(sensor_gnss);
+#endif
+
+struct orb_metadata const *metas[] = {
+#ifdef CONFIG_SENSORS_MS56XX
+    [SENSOR_BARO] = ORB_ID(sensor_baro),
+#endif
+#ifdef CONFIG_SENSORS_LSM6DSO32
+    [SENSOR_ACCEL] = ORB_ID(sensor_accel),
+    [SENSOR_GYRO] = ORB_ID(sensor_gyro),
+#endif
+#ifdef CONFIG_SENSORS_LIS2MDL
+    [SENSOR_MAG] = ORB_ID(sensor_mag),
+#endif
+#ifdef CONFIG_SENSORS_L86_XXX
+    [SENSOR_GPS] = ORB_ID(sensor_gnss),
 #endif
 };
 
@@ -272,6 +288,8 @@ void *packet_thread(void *arg)
   syncro_t *syncro = args_syncro(arg);
   struct configuration_s *config = args_config(arg);
 
+  pyinfo("Packet thread started.\n");
+
   /* Prepare packet header for constructing packets */
 
   packet_header_init(&pkt_hdr, config->radio.callsign, 0);
@@ -284,11 +302,11 @@ void *packet_thread(void *arg)
   /* Get file descriptor to ADC for battery measurements */
 
 #if defined(CONFIG_RP2040_ADC)
-  adc = open("/dev/adc0", O_RDONLY);
+  adc = open(CONFIG_PYGMY_TELEM_BAT_ADC, O_RDONLY | O_NONBLOCK);
   if (adc < 0)
     {
       err = errno;
-      fprintf(stderr, "Could not open ADC device: %d\n", err);
+      pyerr("Could not open ADC device: %d\n", err);
     }
 #endif
 
@@ -299,22 +317,6 @@ void *packet_thread(void *arg)
   coordinates.longitude = NAN;
 #endif
 
-  /* Get sensor metadata */
-
-#ifdef CONFIG_SENSORS_MS56XX
-  metas[SENSOR_BARO] = orb_get_meta("sensor_baro");
-#endif
-#ifdef CONFIG_SENSORS_LSM6DSO32
-  metas[SENSOR_ACCEL] = orb_get_meta("sensor_accel");
-  metas[SENSOR_GYRO] = orb_get_meta("sensor_gyro");
-#endif
-#ifdef CONFIG_SENSORS_LIS2MDL
-  metas[SENSOR_MAG] = orb_get_meta("sensor_mag");
-#endif
-#ifdef CONFIG_SENSORS_L86_XXX
-  metas[SENSOR_GPS] = orb_get_meta("sensor_gnss");
-#endif
-
   /* Subscribe to all sensors */
 
   for (int i = 0; i < array_len(fds); i++)
@@ -322,8 +324,8 @@ void *packet_thread(void *arg)
       fds[i].fd = orb_subscribe(metas[i]);
       if (fds[i].fd < 0)
         {
-          fprintf(stderr, "Failed to subscribe to sensor '%s': %d\n",
-                  metas[i]->o_name, errno);
+          pyerr("Failed to subscribe to sensor '%s': %d\n", metas[i]->o_name,
+                errno);
         }
     }
 
@@ -334,28 +336,28 @@ void *packet_thread(void *arg)
       orb_ioctl(fds[SENSOR_ACCEL].fd, SNIOC_SETFULLSCALE, config->imu.xl_fsr);
   if (err < 0)
     {
-      fprintf(stderr, "Failed to set accelerometer FSR: %d\n", errno);
+      pyerr("Failed to set accelerometer FSR: %d\n", errno);
     }
 
   err = orb_ioctl(fds[SENSOR_ACCEL].fd, SNIOC_SET_CALIBVALUE,
                   (unsigned long)config->imu.xl_offsets);
   if (err < 0)
     {
-      fprintf(stderr, "Failed to set accelerometer offsets: %d\n", errno);
+      pyerr("Failed to set accelerometer offsets: %d\n", errno);
     }
 
   err = orb_ioctl(fds[SENSOR_GYRO].fd, SNIOC_SETFULLSCALE,
                   config->imu.gyro_fsr);
   if (err < 0)
     {
-      fprintf(stderr, "Failed to set gyroscope FSR: %d\n", errno);
+      pyerr("Failed to set gyroscope FSR: %d\n", errno);
     }
 
   err = orb_ioctl(fds[SENSOR_GYRO].fd, SNIOC_SET_CALIBVALUE,
                   (unsigned long)config->imu.gyro_offsets);
   if (err < 0)
     {
-      fprintf(stderr, "Failed to set gyroscope offsets: %d\n", errno);
+      pyerr("Failed to set gyroscope offsets: %d\n", errno);
     }
 #endif
 
@@ -366,8 +368,8 @@ void *packet_thread(void *arg)
       err = orb_set_frequency(fds[i].fd, frequencies[i]);
       if (err < 0)
         {
-          fprintf(stderr, "Couldn't set frequency of '%s': %d\n",
-                  metas[i]->o_name, errno);
+          pyerr("Couldn't set frequency of '%s': %d\n", metas[i]->o_name,
+                errno);
         }
     }
 
@@ -384,7 +386,7 @@ void *packet_thread(void *arg)
       err = packet_push(pkt_cur, &pkt_hdr, sizeof(pkt_hdr));
       if (err)
         {
-          fprintf(stderr, "Out of packet space!\n");
+          pyerr("Out of packet space!\n");
         }
 
         /* Construct a packet from sensor data */
@@ -396,12 +398,12 @@ void *packet_thread(void *arg)
       if (b_read < 0)
         {
           err = errno;
-          fprintf(stderr, "Couldn't read battery voltage: %d", err);
+          pyerr("Couldn't read battery voltage: %d", err);
           goto uorb_collection;
         }
       else if (b_read < sizeof(voltage))
         {
-          fprintf(stderr, "Couldn't read full battery voltage\n");
+          pywarn("Couldn't read full battery voltage\n");
           goto uorb_collection;
         }
 
@@ -434,7 +436,7 @@ void *packet_thread(void *arg)
 
           if (err < 0)
             {
-              fprintf(stderr, "Error polling sensors: %d\n", errno);
+              pyerr("Error polling sensors: %d\n", errno);
               continue;
             }
 
@@ -451,7 +453,7 @@ void *packet_thread(void *arg)
                   err = orb_copy(metas[i], fds[i].fd, uorb_data);
                   if (err < 0)
                     {
-                      fprintf(stderr, "Error copying uORB data: %d\n", errno);
+                      pyerr("Error copying uORB data: %d\n", errno);
                       continue;
                     }
 
@@ -476,7 +478,7 @@ void *packet_thread(void *arg)
       err = syncro_publish(syncro, pkt_cur);
       if (err)
         {
-          fprintf(stderr, "Couldn't publish new packet: %d\n", err);
+          pyerr("Couldn't publish new packet: %d\n", err);
         }
 
       /* Swap to already consumed packet buffer for next iteration */
